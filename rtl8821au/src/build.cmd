@@ -5,8 +5,10 @@ rem Run this in the directory that holds the sources (see ..\BUILD.md).
 rem usage: build                 (compile everything and link)
 rem        build file1 file2 ... (recompile only these C files, e.g. "build rt_usb", then link)
 rem Adjust the next two lines if Open Watcom / NASM are installed elsewhere.
-set WATCOM=C:\WATCOM
-set PATH=C:\WATCOM\binp;C:\usr\bin;%PATH%
+rem WATCOM: an existing setting (your Open Watcom install) is kept; C:\WATCOM is only the fallback.
+rem wlink reads %WATCOM%\binw\wlsystem.lnk, so WATCOM must point at the real install.
+if "%WATCOM%"=="" set WATCOM=C:\WATCOM
+set PATH=%WATCOM%\binp;C:\usr\bin;%PATH%
 set INCLUDE=
 echo build start > build.log
 for %%f in (rt_hdr rt_lib rt_ndisx rt_end) do nasm -f obj %%f.asm -o %%f.obj >> build.log 2>&1
