@@ -2,10 +2,8 @@
 rem SPDX-License-Identifier: GPL-2.0-only
 rem RTL88EU build with Open Watcom 16-bit C + NASM + wlink only. Log: build.log
 rem usage: build              (everything)     build file1 file2 ...   (only these C files, then link)
-rem WATCOM: an existing setting (your Open Watcom install) is kept; C:\WATCOM is only the fallback.
-rem wlink reads %WATCOM%\binw\wlsystem.lnk, so WATCOM must point at the real install.
-if "%WATCOM%"=="" set WATCOM=C:\WATCOM
-set PATH=%WATCOM%\binp;C:\usr\bin;%PATH%
+set WATCOM=C:\WATCOM
+set PATH=C:\WATCOM\binp;C:\usr\bin;%PATH%
 set INCLUDE=
 z:
 cd \WiFi-RTL8188EU-ArcaOS\v012\src

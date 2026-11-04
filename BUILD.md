@@ -11,8 +11,7 @@ Each driver has its own `src` folder with its own `build.cmd` and `rtl88eu.lnk`:
 
 ## Steps
 
-1. Put `C:\WATCOM\binp` (Open Watcom OS/2 host tools) and NASM on the `PATH`, set `WATCOM` to the Open Watcom directory (the build scripts keep it and fall
-   back to `C:\WATCOM` only when it is unset; `wlink` needs `%WATCOM%\binw\wlsystem.lnk`), and leave
+1. Put `C:\WATCOM\binp` (Open Watcom OS/2 host tools) and NASM on the `PATH`, set `WATCOM=C:\WATCOM`, and leave
    `INCLUDE` empty (the drivers include none of the Open Watcom headers).
 2. In the `src` folder run the build script. It assembles `rt_hdr.asm`, `rt_lib.asm`, `rt_ndisx.asm` and `rt_end.asm`
    with `nasm -f obj`, compiles the C files with
