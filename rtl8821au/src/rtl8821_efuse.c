@@ -87,7 +87,10 @@ int rtl8821_efuse_load(usb_dev_t *dev)
       if (m[i] != 0xFF) ff = 0;
    }
    if (any && !ff && !(m[0] & 1))                 /* a unicast, programmed address */
-      for (i = 0; i < 6; i++) g_mymac[i] = m[i];
+      (void)ndis_set_mac(m);                      /* adopted unless TCP/IP already bound with the fallback address:
+                                                   * then the radio keeps that one (g_mymac unchanged), so the
+                                                   * address the stack puts in its frames and ARP replies is the
+                                                   * one the chip filters on and associates with */
 out:
    efuse_power(dev, 0);
    return rc;
