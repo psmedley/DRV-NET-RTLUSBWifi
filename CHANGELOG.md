@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### RTL8821AU
+* **No traffic although connected and with an address** (reported on xHCI; the stack showed physical address
+  `0288E0000001`). When TCP/IP binds before the dongle has answered, it copies the driver's fallback address
+  `02:88:E0:00:00:01`; the eFuse read later replaced the radio's address with the real one, but the stack kept
+  sending its frames and ARP replies with the fallback one, and dropped received frames addressed to the real one.
+  DHCP still worked because the driver's own client uses the radio's address. The eFuse address is now adopted only
+  through `ndis_set_mac()` (as in the 8188EU driver): if the stack is already bound with the fallback address, the
+  radio keeps that one, so both sides agree. Plugging the dongle in before boot gives the real address as before.
+* The DHCP lines (`STATUS=`, `IP=`, `MASK=`, ...) come first in the `\DEV\WRND32$` read-out. With the larger scan table
+  of 0.1.4a1 the diagnostics filled the 3900-byte text buffer, the lease lines were cut off, and `rtl88eu_ip.cmd`
+  logged `no lease:` at every renewal (once even a truncated netmask `255.255`).
+
 ## 0.1.4a1 (2026-11-02)
 
 Alpha: built from the 0.1.3 sources plus the changes below. Contributions by Paul Smedley (the 5 GHz frequency report and the transmit
