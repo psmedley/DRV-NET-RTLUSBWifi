@@ -30,6 +30,13 @@
   compile date and time, the read-out has a new line `BUILD=<version>-<tag> <date> <time>` after the DHCP lines, and the
   BLDLEVEL description in `rtl88eu.lnk` carries it too (kept in step by hand). `DRV_VERSION` moved from `rt_strat.c` to
   `rt_usb.h`.
+* Fewer USB receive transfers while joined. The receive path keeps one bulk-IN request outstanding, so each frame the
+  chip passes up costs a USB round trip, and that rate caps downloads (2.5 MB/s at 54 Mbit/s and at MCS 7, for one
+  connection or two together). Once joined, control frames are no longer passed to the host (REG_RXFLTMAP1 0xFFFF ->
+  0x0400, PS-Poll only, as Realtek's driver sets it): before, the access point's ACK of every frame we sent came up as
+  one more transfer. The join itself still sees every control frame (its ACK diagnostics), and so do scans. TX reports
+  are requested for every 16th data frame instead of every 4th (they only feed the XR* counters). The read-out
+  counters `ACK` / `CTL` stop counting after the join. Switches: `R21_CTLMAP_LINKED`, `R21_RPT_MASK` in `rt_usb.h`.
 
 ## 0.1.4a2 (2026-11-06)
 
