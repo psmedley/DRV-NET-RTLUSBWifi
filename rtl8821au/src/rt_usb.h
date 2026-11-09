@@ -457,12 +457,22 @@ extern UCHAR  g_r21_iqk, g_r21_iqk_c2h, g_r21_pa5g, g_r21_lna5g;
 extern volatile UCHAR g_r21_iqk_done;
 extern ULONG  g_r21_iqc[6];
 extern USHORT g_r21_h2c_busy;
+/* USB receive budget. The receive path keeps one bulk-IN request outstanding (rt_usb.c, RXN), so every frame the chip
+ * hands up costs a whole USB transfer round trip, and that rate caps the download (2.5 MB/s, the same at 54 Mbit/s and
+ * at MCS 7, for one connection or two). Frames the driver does not need should stay in the chip:
+ *   R21_CTLMAP_LINKED  control-frame subtypes passed up once joined (REG_RXFLTMAP1, bit n = subtype n). 0x0400 =
+ *                      PS-Poll only, as Realtek's driver sets it; 0xFFFF (the old value) also passes the access point's
+ *                      ACK of every frame we send, one extra USB transfer per transmitted frame.
+ *   R21_RPT_MASK       a TX report for every (mask + 1)th data frame: 3 = every 4th (old), 15 = every 16th. The reports
+ *                      only feed the XR* read-out counters. */
+#define R21_CTLMAP_LINKED  0x0400
+#define R21_RPT_MASK       15
 
 /* Version and build tag. DRV_BUILD names the change set a test build was made from (set it per branch / pull request), so
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a2"
-#define DRV_BUILD     "dev"
+#define DRV_BUILD     "rxfilter"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
