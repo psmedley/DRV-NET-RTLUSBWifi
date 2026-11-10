@@ -478,7 +478,7 @@ extern UCHAR  g_rxq_max, g_rxqb_max;
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "release"
+#define DRV_BUILD     "rxqdiag"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
