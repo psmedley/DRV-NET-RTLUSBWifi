@@ -458,6 +458,10 @@ extern UCHAR  g_r21_iqk, g_r21_iqk_c2h, g_r21_pa5g, g_r21_lna5g;
 extern volatile UCHAR g_r21_iqk_done;
 extern ULONG  g_r21_iqc[6];
 extern USHORT g_r21_h2c_busy;
+void   rtl8188eu_rxq_tick(usb_dev_t *dev);        /* rtl_rx.c: sample the chip's receive buffer fill (diagnostic) */
+void   rtl8188eu_rxq_burst(usb_dev_t *dev);
+extern USHORT g_rxq_hist[5], g_rxqb_n, g_rxqb_sum, g_rxqb_nz, g_rxqb_ms;
+extern UCHAR  g_rxq_max, g_rxqb_max;
 /* USB receive budget. The receive path keeps one bulk-IN request outstanding (rt_usb.c, RXN), so every frame the chip
  * hands up costs a whole USB transfer round trip. Frames the driver does not need should stay in the chip. (Measured:
  * about a third fewer transfers per downloaded frame, but no change in download speed, about 2.5 MB/s, so the transfer

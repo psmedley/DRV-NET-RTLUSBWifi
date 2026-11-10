@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### RTL8821AU
+* Diagnostic: how full the chip's receive buffer is. New read-out line `RXQ BURST= AVG= NZ= MAX= MS= TICK= TMAX=`,
+  from the packet count in REG_RXPKT_NUM (byte 0x0287, frames waiting for the USB bulk-IN path): 64 reads in a row at
+  every read-out (their average, how many were above 0, the largest, how long the 64 reads took), and one sample a
+  second from the request path, counted by fill 0 / 1 / 2-3 / 4-7 / 8+ with their maximum. Frames piling up during a
+  download mean the host is slow to collect them; an empty buffer means the data does not arrive faster over the air.
 * Fewer USB receive transfers while joined. Once joined, control frames are no longer passed to the host
   (REG_RXFLTMAP1 0xFFFF -> 0x0400, PS-Poll only, as Realtek's driver sets it): before, the access point's ACK of every
   frame we sent came up as one more USB transfer. The join itself still sees every control frame (its ACK diagnostics),

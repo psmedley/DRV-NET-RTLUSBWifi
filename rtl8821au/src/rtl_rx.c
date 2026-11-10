@@ -1562,6 +1562,55 @@ USHORT rtl8188eu_diag(USHORT i)
    return 0xFFFF;
 }
 
+/* ===== Receive buffer fill (diagnostic) ================================================================
+ * REG_RXPKT_NUM (0x0284) bits 31:24, the byte at 0x0287: frames waiting in the chip's receive packet buffer for the USB
+ * bulk-IN path ("the number of packets in RXPKTBUF", rtl8703b_spec.h; read the same way in hal_com.c). The receive path
+ * keeps one bulk-IN request outstanding, so frames that arrive while it is being completed and resubmitted wait there.
+ * Sampled once a second from the request path (rtl8188eu_rxq_tick) and RXQ_BURST times in a row at every read-out
+ * (rtl8188eu_rxq_burst, so a read-out taken during a download shows the fill at that moment). Frames piling up during
+ * a download: the chip has data the host is slow to collect (USB receive aggregation would help). An empty buffer:
+ * the data does not arrive faster over the air. */
+#define RXQ_BURST  64
+USHORT g_rxq_hist[5];                              /* tick samples by fill: 0, 1, 2-3, 4-7, 8 or more frames */
+UCHAR  g_rxq_max;                                  /* largest tick sample */
+USHORT g_rxqb_n, g_rxqb_sum, g_rxqb_nz, g_rxqb_ms;   /* last burst: reads, sum, reads > 0, duration (ms) */
+UCHAR  g_rxqb_max;
+
+void rtl8188eu_rxq_tick(usb_dev_t *dev)            /* task time, request lock, about once a second */
+{
+   UCHAR v;
+
+   if (!g_joined)
+      return;
+   v = rtw_read8(dev, 0x0287);
+   if (v > g_rxq_max)
+      g_rxq_max = v;
+   g_rxq_hist[v == 0 ? 0 : v < 2 ? 1 : v < 4 ? 2 : v < 8 ? 3 : 4]++;
+}
+
+void rtl8188eu_rxq_burst(usb_dev_t *dev)           /* task time (the device read) */
+{
+   USHORT i;
+   UCHAR  v;
+   ULONG  t0;
+
+   g_rxqb_n = g_rxqb_sum = g_rxqb_nz = g_rxqb_ms = 0;
+   g_rxqb_max = 0;
+   if (!g_joined || !g_hw_ready)
+      return;
+   t0 = rtl8188eu_ms();
+   for (i = 0; i < RXQ_BURST; i++) {
+      v = rtw_read8(dev, 0x0287);
+      g_rxqb_n++;
+      g_rxqb_sum = (USHORT)(g_rxqb_sum + v);      /* at most 64 x 255 */
+      if (v)
+         g_rxqb_nz++;
+      if (v > g_rxqb_max)
+         g_rxqb_max = v;
+   }
+   g_rxqb_ms = (USHORT)(rtl8188eu_ms() - t0);
+}
+
 /* A chip register read for the diagnostics (n 0..11; half 1 = high 16 bits, 0 = low 16 bits). */
 USHORT rtl8188eu_diag_reg(USHORT n, USHORT half)
 {

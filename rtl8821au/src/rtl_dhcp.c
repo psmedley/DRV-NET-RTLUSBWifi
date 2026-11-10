@@ -355,6 +355,17 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" IQC=");
       for (q = 0; q < 6; q++) { put_h32(g_r21_iqc[q]); put_s(q == 2 ? "/" : (q == 5 ? "" : " ")); }
       put_s("\r\n");
+      rtl8188eu_rxq_burst(&g_usbdev);                          /* frames waiting in the chip's receive buffer: */
+      put_s("RXQ BURST="); put_dec(g_rxqb_n);                   /* reads now, their average / reads > 0 / max /    */
+      put_s(" AVG=");                                          /* duration; then the once-a-second samples by      */
+      if (g_rxqb_n) {                                          /* fill 0 / 1 / 2-3 / 4-7 / 8+ and their maximum    */
+         put_dec((USHORT)(g_rxqb_sum / g_rxqb_n)); put_s(".");
+         put_dec((USHORT)(((g_rxqb_sum % g_rxqb_n) * 10) / g_rxqb_n));
+      } else put_s("-");
+      put_s(" NZ="); put_dec(g_rxqb_nz); put_s(" MAX="); put_dec(g_rxqb_max); put_s(" MS="); put_dec(g_rxqb_ms);
+      put_s(" TICK="); put_dec(g_rxq_hist[0]); put_s("/"); put_dec(g_rxq_hist[1]); put_s("/"); put_dec(g_rxq_hist[2]);
+      put_s("/"); put_dec(g_rxq_hist[3]); put_s("/"); put_dec(g_rxq_hist[4]); put_s(" TMAX="); put_dec(g_rxq_max);
+      put_s("\r\n");
    }
    {  /* scan table */
       USHORT n, q;
