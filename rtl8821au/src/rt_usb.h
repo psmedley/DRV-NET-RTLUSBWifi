@@ -462,8 +462,11 @@ extern USHORT g_r21_h2c_busy;
 /* Block Ack receive. R21_BA 1 accepts the access point's ADDBA request, so it can send A-MPDUs; 0 declines (frames
  * single, as before). R21_BA_WIN: the largest buffer size we answer with. R21_AMPDU_PARAM: the HT capabilities' A-MPDU
  * byte, maximum length 8 KB (about 5 full frames, so a burst fits the chip's receive buffer while the one bulk-IN
- * request drains it) and no minimum spacing. Frames are passed up as they arrive: no reorder buffer (rtl_rx.c). */
-#define R21_BA          1
+ * request drains it) and no minimum spacing. Frames are passed up as they arrive: no reorder buffer (rtl_rx.c).
+ * Default 0: in the first test (5 GHz) the agreements were set up, but no frame arrived on an agreed TID, the access
+ * point sent plain (non-QoS) data at MCS 4-5, and downloads were slower (1.91 MB/s). The AGG read-out line is there to
+ * find out why; set R21_BA 1 to test. */
+#define R21_BA          0
 #define R21_BA_WIN      8
 #define R21_AMPDU_PARAM 0x00
 void   rtl8188eu_ba_tick(usb_dev_t *dev);         /* rtl_rx.c: answer a pending ADDBA request (task time, request lock) */
@@ -472,6 +475,7 @@ int    ndis_kick(void);                           /* rt_ndis.c: arm the context 
 UCHAR  rtl8188eu_ht_state(void);                  /* rtl_rx.c: what the association response granted (read-out) */
 extern UCHAR  g_r21_ht, g_ba_tid, g_r21_ba;
 extern USHORT g_ba_rx, g_ba_ooo, g_ba_gap, g_ba_dupw, g_ba_del;
+extern USHORT g_agg_all, g_agg_me, g_dq_qos, g_dq_plain, g_dq_tid[8];
 UCHAR  rtl8188eu_ba_on(void);                    /* rtl_rx.c: bit n = Block Ack agreement for TID n */
 extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_amsdu_sub, g_amsdu_bad;
 

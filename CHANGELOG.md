@@ -20,7 +20,8 @@
     `HT= GRANT= BA= FAST= BAMS= TID= AMSDU=` (GRANT: 1 = the association response has HT capabilities, 2 = HT
     operation, 4 = WMM parameters; BA: requests / declines sent / failed; FAST: declines sent from the context hook;
     BAMS: request to decline, the last one, ms; AMSDU: frames / subframes / dropped).
-* Block Ack receive (A-MPDU). The access point's ADDBA request is now accepted (`R21_BA 1`; 0 declines as before), so
+* Block Ack receive (A-MPDU), off by default (`R21_BA 0` declines as before; 1 accepts). With it on, the access point's
+  ADDBA request is accepted, so
   it can send A-MPDUs: several frames per channel access with one Block Ack, which the chip sends by itself. The
   answer keeps the request's policy and TID, turns A-MSDU-in-A-MPDU off, and limits the buffer to `R21_BA_WIN` (8)
   frames; the HT capabilities now advertise a maximum A-MPDU of 8 KB (`R21_AMPDU_PARAM`), about 5 full frames, so a
@@ -28,6 +29,10 @@
   agreement the duplicate filter remembers the last 16 sequence numbers instead of the last one. A DELBA from the
   access point ends the agreement. New read-out line `BAACC= BAON= BARX= OOO= GAP= DUPW= DELBA=` (switch, TIDs with
   an agreement, their frames, frames out of order, sequence gaps, duplicates caught, DELBAs received).
+  First test (5 GHz, `R21_BA 1`): three agreements were set up, but no frame arrived on an agreed TID, the access
+  point sent plain (non-QoS) data at MCS 4-5 and the download was slower (1.91 MB/s), hence the default. A second
+  read-out line `AGG ALL= ME= QOS= PLAIN= TID=` counts frames that came in an A-MPDU (receive descriptor PAGGR bit;
+  any address / to us), data frames to us by kind, and QoS data frames to us per TID.
 
 ## 0.1.4a4 (2026-11-09)
 

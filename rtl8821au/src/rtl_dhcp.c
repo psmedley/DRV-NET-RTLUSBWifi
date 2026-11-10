@@ -368,6 +368,11 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" GAP="); put_dec(g_ba_gap); put_s(" DUPW="); put_dec(g_ba_dupw);  /* caught by the window, DELBAs   */
       put_s(" DELBA="); put_dec(g_ba_del);
       put_s("\r\n");
+      put_s("AGG ALL="); put_dec(g_agg_all); put_s(" ME="); put_dec(g_agg_me);   /* frames from an A-MPDU (any / to us); */
+      put_s(" QOS="); put_dec(g_dq_qos); put_s(" PLAIN="); put_dec(g_dq_plain);   /* data to us: QoS / plain; QoS by TID */
+      put_s(" TID=");
+      for (q = 0; q < 8; q++) { put_dec(g_dq_tid[q]); if (q < 7) put_s("/"); }
+      put_s("\r\n");
    }
    {  /* scan table */
       USHORT n, q;

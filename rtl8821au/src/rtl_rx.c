@@ -347,6 +347,11 @@ static UCHAR  g_rxsw;
  * traffic identifier (QoS TID 0..15, 16 = non-QoS). */
 static USHORT g_sc[17];
 
+/* Diagnostics for the Block Ack test (read-out line AGG): frames that came in an A-MPDU (any address / to us), data
+ * frames to us by kind (QoS, plain), QoS data frames to us per TID. */
+static UCHAR  g_rxagg;                             /* set by rx_parse for the frame being handled */
+USHORT        g_agg_all, g_agg_me, g_dq_qos, g_dq_plain, g_dq_tid[8];
+
 /* Block Ack receive (R21_BA). With an agreement for a traffic identifier the access point sends A-MPDUs: several frames
  * per channel access, one Block Ack for all of them (the chip sends it). A frame lost in a burst is resent in a later
  * one, after frames that follow it, so frames of that TID can arrive out of order. There is no reorder buffer: frames
@@ -519,6 +524,15 @@ static void rx_data_frame(UCHAR *f, USHORT len)
       for (i = 0; i < 6; i++)
          if (f[4 + i] != g_mymac[i])
             return;
+   if ((f[4] & 1) == 0) {                         /* unicast to us: what kind of frame, did it come aggregated */
+      if (g_rxagg)
+         g_agg_me++;
+      if (f[0] & 0x80) {
+         g_dq_qos++;
+         g_dq_tid[f[24] & 0x07]++;
+      } else
+         g_dq_plain++;
+   }
    {
       USHORT sc  = (USHORT)(f[22] | (f[23] << 8));
       UCHAR  tid = (UCHAR)((f[0] & 0x80) ? (f[24] & 0x0F) : 16);
@@ -980,6 +994,9 @@ static void rx_parse(void)
       if (remain < total)
          break;                                  /* wait for the rest            */
       g_rxsw = (UCHAR)(p[3] & 0x08);                /* RX desc dw0 bit 27: chip did not decrypt */
+      g_rxagg = (UCHAR)(p[5] & 0x80);               /* RX desc dw1 bit 15 (PAGGR): the frame came in an A-MPDU */
+      if (g_rxagg)
+         g_agg_all++;
       if (p[11] & 0x10)                           /* RX desc dw2 bit 28: a C2H report, not a received frame */
          rx_c2h(p + 24 + drv + sh, pl);
       else if (!(p[1] & 0xC0)) {                  /* skip CRC32 / ICV-error frames */
