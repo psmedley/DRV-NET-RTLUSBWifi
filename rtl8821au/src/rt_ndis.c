@@ -216,6 +216,17 @@ USHORT ndis_diag(USHORT i)
    return 0xFFFF;
 }
 
+/* Free receive buffers right now (the reorder buffer checks before it releases a run of held frames). */
+USHORT ndis_rx_avail(void)
+{
+   USHORT i, n = 0;
+
+   for (i = 0; i < RXP_N; i++)
+      if (!g_rxp_busy[i])
+         n++;
+   return n;
+}
+
 UCHAR *ndis_rx_get(USHORT *handle)
 {
    USHORT i;

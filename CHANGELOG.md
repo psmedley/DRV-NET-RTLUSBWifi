@@ -20,8 +20,7 @@
     `HT= GRANT= BA= FAST= BAMS= TID= AMSDU=` (GRANT: 1 = the association response has HT capabilities, 2 = HT
     operation, 4 = WMM parameters; BA: requests / declines sent / failed; FAST: declines sent from the context hook;
     BAMS: request to decline, the last one, ms; AMSDU: frames / subframes / dropped).
-* Block Ack receive (A-MPDU), off by default (`R21_BA 0` declines as before; 1 accepts). With it on, the access point's
-  ADDBA request is accepted, so
+* Block Ack receive (A-MPDU), on (`R21_BA 1`; 0 declines as before). The access point's ADDBA request is accepted, so
   it can send A-MPDUs: several frames per channel access with one Block Ack, which the chip sends by itself. The
   answer keeps the request's policy and TID, turns A-MSDU-in-A-MPDU off, and limits the buffer to `R21_BA_WIN` (8)
   frames; the HT capabilities now advertise a maximum A-MPDU of 8 KB (`R21_AMPDU_PARAM`), about 5 full frames, so a
@@ -33,6 +32,15 @@
   point sent plain (non-QoS) data at MCS 4-5 and the download was slower (1.91 MB/s), hence the default. A second
   read-out line `AGG ALL= ME= QOS= PLAIN= TID=` counts frames that came in an A-MPDU (receive descriptor PAGGR bit;
   any address / to us), data frames to us by kind, and QoS data frames to us per TID.
+  Second test (`R21_BA 1`): nearly every download frame came in an A-MPDU (QoS, TID 0, MCS 7, no DELBA), so the
+  agreement works, but 4% arrived out of order and the download was slower than with the agreement declined (2.08
+  against 2.35 MB/s): TCP takes reordered segments for loss. Hence a reorder buffer for TID 0 (IEEE 802.11-2016
+  10.24.7): frames ahead of a missing one are held, up to 8, and go up in sequence order once it arrives. With no
+  timer in the driver, held frames are also released (skipping the gap) when the window has to slide, when the
+  access point sends a Block Ack Request, and when a frame arrives while the oldest held one has waited more than
+  `R21_RO_MS` (20 ms). The held frames live in 12.8 KB of physical memory allocated at INIT, outside the data
+  segment, which is nearly full. A release pauses while no NDIS receive buffer is free and resumes with the next
+  frame. New read-out line `RO HELD= REL= SKIP= STALE= BAR= LATE= DROP= MAX= WAIT=`.
 
 ## 0.1.4a4 (2026-11-09)
 

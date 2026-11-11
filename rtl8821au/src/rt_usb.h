@@ -463,12 +463,17 @@ extern USHORT g_r21_h2c_busy;
  * single, as before). R21_BA_WIN: the largest buffer size we answer with. R21_AMPDU_PARAM: the HT capabilities' A-MPDU
  * byte, maximum length 8 KB (about 5 full frames, so a burst fits the chip's receive buffer while the one bulk-IN
  * request drains it) and no minimum spacing. Frames are passed up as they arrive: no reorder buffer (rtl_rx.c).
- * Default 0: in the first test (5 GHz) the agreements were set up, but no frame arrived on an agreed TID, the access
- * point sent plain (non-QoS) data at MCS 4-5, and downloads were slower (1.91 MB/s). The AGG read-out line is there to
- * find out why; set R21_BA 1 to test. */
-#define R21_BA          0
+ * Tests (5 GHz): with the agreement accepted, nearly every download frame arrives in an A-MPDU at MCS 7, but about 4%
+ * arrive out of order (a frame lost in a burst comes back in a later one), and without reordering the download was
+ * slower than with the agreement declined (2.08 against 2.35 MB/s). The reorder buffer for TID 0 (rtl_rx.c, ro_frame)
+ * puts them back in order; R21_BA 0 declines the agreement as before. */
+#define R21_BA          1
 #define R21_BA_WIN      8
 #define R21_AMPDU_PARAM 0x00
+#define R21_RO_MS       20      /* reorder buffer: a held frame older than this is given up on (rtl_rx.c, ro_frame) */
+int    rtl8188eu_ro_alloc(void);                  /* rtl_rx.c: INIT, the reorder buffer's memory (0 = ok) */
+extern USHORT g_ro_held, g_ro_rel, g_ro_skip, g_ro_stale, g_ro_bar, g_ro_late, g_ro_drop, g_ro_wait;
+extern UCHAR  g_ro_max;
 void   rtl8188eu_ba_tick(usb_dev_t *dev);         /* rtl_rx.c: answer a pending ADDBA request (task time, request lock) */
 void   rtl8188eu_ba_hook(void);                   /* rtl_rx.c: the same from the context hook, without blocking */
 int    ndis_kick(void);                           /* rt_ndis.c: arm the context hook (0 = no hook)                */
@@ -483,7 +488,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "ba-rx"
+#define DRV_BUILD     "ba-ro"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
