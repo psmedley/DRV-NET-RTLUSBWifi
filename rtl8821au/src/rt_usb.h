@@ -246,7 +246,7 @@ void usb_mdelay(USHORT ms);
  * not block) feeds rtl_rx_feed() and immediately resubmits. TX: a small pool of
  * slots; usb_tx_submit() posts one frame without waiting, completion frees it. */
 #define USB_RXBUF     2048
-#define USB_TXSLOTS   8
+#define USB_TXSLOTS   6                  /* was 8: NTXNOSLOT stayed 0 in every test; the 3.2 KB of DGROUP go to NDIS receive buffers (RXP_N) */
 #define USB_TXBUF     1620
 int    usb_rx_start(usb_dev_t *dev, UCHAR ep);
 void   usb_rx_stop(void);
@@ -488,7 +488,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "ba-ro"
+#define DRV_BUILD     "ba-ro8"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 

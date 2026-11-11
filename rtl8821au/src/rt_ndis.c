@@ -164,7 +164,7 @@ WORD ndis_is_open(void)
 /* ---- receive: buffer pool + ReceiveChain indication ------------------------------
  * Called from the USB completion context (task time, may not block). A buffer stays busy until ReceiveRelease
  * when the protocol returns WAIT_FOR_RELEASE. */
-#define RXP_N     6
+#define RXP_N     8                       /* was 6: the Block Ack reorder buffer releases runs of frames; with 6 it waited for free buffers (RO WAIT, HKMAXQ=6) */
 #define RXP_SIZE  1520
 static UCHAR            g_rxp[RXP_N][RXP_SIZE];
 static UCHAR            g_rxp_busy[RXP_N];

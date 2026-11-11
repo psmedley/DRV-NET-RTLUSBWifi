@@ -41,6 +41,11 @@
   `R21_RO_MS` (20 ms). The held frames live in 12.8 KB of physical memory allocated at INIT, outside the data
   segment, which is nearly full. A release pauses while no NDIS receive buffer is free and resumes with the next
   frame. New read-out line `RO HELD= REL= SKIP= STALE= BAR= LATE= DROP= MAX= WAIT=`.
+  Third test (5 GHz, reorder buffer on): 2.99 MB/s, the best so far (Windows 3.4-3.8). Every held frame went up
+  in order (`HELD=REL=3929`, no skips, no stale releases), but releases waited 48 times for a free NDIS receive
+  buffer and the delivery queue reached all 6. So the driver now has 8 NDIS receive buffers (`RXP_N`, was 6) and
+  6 USB transmit slots (`USB_TXSLOTS`, was 8; all transmit slots were never busy in any test), which leaves the
+  data segment about 200 bytes smaller. With 8 the delivery queue index also no longer jumps when its 16-bit counter wraps.
 
 ## 0.1.4a4 (2026-11-09)
 
