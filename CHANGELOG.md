@@ -46,6 +46,12 @@
   buffer and the delivery queue reached all 6. So the driver now has 8 NDIS receive buffers (`RXP_N`, was 6) and
   6 USB transmit slots (`USB_TXSLOTS`, was 8; all transmit slots were never busy in any test), which leaves the
   data segment about 200 bytes smaller. With 8 the delivery queue index also no longer jumps when its 16-bit counter wraps.
+  Fourth test (`ba-ro8`): 3.03 MB/s on 5 GHz (`WAIT=0`, all 8 receive buffers used), but 2.26 MB/s on 2.4 GHz,
+  against about 2.5 without the agreement. On 2.4 GHz (a busier channel: `XRQAVG` 31 against 8) 17.6% of the frames
+  came out of order, and the access point can't send more than the window (8) past a lost frame until it is
+  resent. Hence a 16-frame window (`R21_BA_WIN`; the reorder buffer follows it, 25.6 KB of physical memory) and a
+  16 KB maximum A-MPDU (`R21_AMPDU_PARAM` 0x01, about 10 full frames; the chip's receive buffer is 16 KB). The
+  6 USB transmit slots ran out 3 times in that download (`NTXNOSLOT`), so there are 7 again.
 
 ## 0.1.4a4 (2026-11-09)
 

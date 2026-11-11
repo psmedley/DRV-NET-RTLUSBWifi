@@ -613,7 +613,7 @@ static void rx_data_body(UCHAR *f, USHORT len)
  * INIT, reached through a GDT selector that the first join maps (task time, ring 0). Without it, frames go up
  * as they arrive, as before. A held frame is copied back into g_ro_tmp and handed to rx_data_body when its turn comes.
  * Everything here runs in the receive path. */
-#define RO_SLOTS   8                               /* = R21_BA_WIN, a power of two */
+#define RO_SLOTS   R21_BA_WIN                      /* a power of two (16: 25.6 KB of physical memory) */
 #define RO_SLOT    1600                            /* largest frame held: 802.11 + CCMP headers + 1500 bytes */
 static ULONG  g_ro_phys;
 static USHORT g_ro_sel;

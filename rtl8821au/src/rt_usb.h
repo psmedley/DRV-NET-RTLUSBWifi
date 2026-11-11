@@ -246,7 +246,7 @@ void usb_mdelay(USHORT ms);
  * not block) feeds rtl_rx_feed() and immediately resubmits. TX: a small pool of
  * slots; usb_tx_submit() posts one frame without waiting, completion frees it. */
 #define USB_RXBUF     2048
-#define USB_TXSLOTS   6                  /* was 8: NTXNOSLOT stayed 0 in every test; the 3.2 KB of DGROUP go to NDIS receive buffers (RXP_N) */
+#define USB_TXSLOTS   7                  /* was 8: 2 KB of DGROUP went to NDIS receive buffers (RXP_N); with 6, a 2.4 GHz download ran out 3 times (NTXNOSLOT) */
 #define USB_TXBUF     1620
 int    usb_rx_start(usb_dev_t *dev, UCHAR ep);
 void   usb_rx_stop(void);
@@ -466,10 +466,14 @@ extern USHORT g_r21_h2c_busy;
  * Tests (5 GHz): with the agreement accepted, nearly every download frame arrives in an A-MPDU at MCS 7, but about 4%
  * arrive out of order (a frame lost in a burst comes back in a later one), and without reordering the download was
  * slower than with the agreement declined (2.08 against 2.35 MB/s). The reorder buffer for TID 0 (rtl_rx.c, ro_frame)
- * puts them back in order; R21_BA 0 declines the agreement as before. */
+ * puts them back in order; R21_BA 0 declines the agreement as before.
+ * With 8 frames and 8 KB, 2.4 GHz (a busy channel) lost about 1 frame in 6 in its burst, and the access point could not
+ * send past SSN + 8 while a lost one was resent: 2.26 MB/s, against 2.5 without the agreement (5 GHz: 3.03). Hence 16
+ * frames (RO_SLOTS in rtl_rx.c follows) and 16 KB (about 10 full frames; the chip's RX buffer is 16 KB). 8 and 0x00
+ * restore the earlier values. */
 #define R21_BA          1
-#define R21_BA_WIN      8
-#define R21_AMPDU_PARAM 0x00
+#define R21_BA_WIN      16      /* a power of two: the reorder buffer's slot count (rtl_rx.c, RO_SLOTS) */
+#define R21_AMPDU_PARAM 0x01    /* maximum A-MPDU 16 KB, no minimum spacing */
 #define R21_RO_MS       20      /* reorder buffer: a held frame older than this is given up on (rtl_rx.c, ro_frame) */
 int    rtl8188eu_ro_alloc(void);                  /* rtl_rx.c: INIT, the reorder buffer's memory (0 = ok) */
 extern USHORT g_ro_held, g_ro_rel, g_ro_skip, g_ro_stale, g_ro_bar, g_ro_late, g_ro_drop, g_ro_wait;
@@ -488,7 +492,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "ba-ro8"
+#define DRV_BUILD     "ba-w16"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
