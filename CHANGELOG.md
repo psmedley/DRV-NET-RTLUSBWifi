@@ -52,6 +52,13 @@
   resent. Hence a 16-frame window (`R21_BA_WIN`; the reorder buffer follows it, 25.6 KB of physical memory) and a
   16 KB maximum A-MPDU (`R21_AMPDU_PARAM` 0x01, about 10 full frames; the chip's receive buffer is 16 KB). The
   6 USB transmit slots ran out 3 times in that download (`NTXNOSLOT`), so there are 7 again.
+  Fifth test (`ba-w16`): 3.07 MB/s on 5 GHz and 2.35 on 2.4 GHz. The window is used (`MAX=15`), but a release of
+  up to 15 frames is more than the 8 receive buffers: releases waited again (`WAIT` 469 and 910) and frames that
+  arrived in order with no buffer free were dropped (`DNDROP` 26 and 46). Now the context hook, once it has
+  delivered the queued frames and so freed their buffers, resumes a paused release itself instead of leaving it to
+  the next frame (`rtl8188eu_ro_kick`, under a receive path lock against the USB completion, with interrupts off),
+  and an in-order frame that finds no buffer is held in the reorder buffer instead of dropped. New read-out fields
+  `KICK=` (frames the hook sent up) and `FULL=` (in-order frames held for want of a buffer).
 
 ## 0.1.4a4 (2026-11-09)
 

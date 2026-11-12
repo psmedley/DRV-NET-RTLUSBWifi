@@ -377,7 +377,8 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" SKIP="); put_dec(g_ro_skip); put_s(" STALE="); put_dec(g_ro_stale); /* released in order, given up, timeouts, */
       put_s(" BAR="); put_dec(g_ro_bar); put_s(" LATE="); put_dec(g_ro_late);     /* BARs, late frames, held copies dropped, */
       put_s(" DROP="); put_dec(g_ro_drop); put_s(" MAX="); put_dec(g_ro_max);     /* most held at once, runs paused for     */
-      put_s(" WAIT="); put_dec(g_ro_wait);                                          /* want of a receive buffer               */
+      put_s(" WAIT="); put_dec(g_ro_wait);                                          /* want of a receive buffer,              */
+      put_s(" KICK="); put_dec(g_ro_kick); put_s(" FULL="); put_dec(g_ro_full);     /* sent up by the hook, in order but held */
       put_s("\r\n");
    }
    {  /* scan table */

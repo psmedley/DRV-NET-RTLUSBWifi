@@ -557,16 +557,18 @@ void __cdecl ndis_hook_c(void)
 {
    g_hk_run++;
    rtl8188eu_ba_hook();                            /* a pending ADDBA decline goes out first (task time, does not block) */
-   while (g_q_tail != g_q_head) {
-      USHORT i = (USHORT)(g_q_tail % RXP_N), h, len;
+   do {
+      while (g_q_tail != g_q_head) {
+         USHORT i = (USHORT)(g_q_tail % RXP_N), h, len;
 
-      if (g_ind_off != 0)                          /* the protocol has indications off: IndicationOn re-arms us */
-         return;
-      h   = g_q_h[i];
-      len = g_q_len[i];
-      g_q_tail++;
-      deliver(h, len);
-   }
+         if (g_ind_off != 0)                       /* the protocol has indications off: IndicationOn re-arms us */
+            return;
+         h   = g_q_h[i];
+         len = g_q_len[i];
+         g_q_tail++;
+         deliver(h, len);
+      }
+   } while (rtl8188eu_ro_kick());                  /* buffers are free again: held frames waiting for them go up (queued above) */
 }
 
 static void arm_hook(void)

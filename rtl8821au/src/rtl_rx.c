@@ -624,6 +624,8 @@ static USHORT g_ro_len[RO_SLOTS];
 static ULONG  g_ro_t0;                             /* when the oldest held frame was stored */
 static UCHAR  g_ro_tmp[RO_SLOT];
 USHORT        g_ro_held, g_ro_rel, g_ro_skip, g_ro_stale, g_ro_bar, g_ro_late, g_ro_drop, g_ro_wait;
+USHORT        g_ro_kick, g_ro_full;                /* frames released from the context hook; in-order frames held for want of a buffer */
+static USHORT g_rx_owner;                          /* receive path lock: the USB completion (rtl_rx_feed) and the hook (ro_kick) */
 UCHAR         g_ro_max;
 
 /* INIT (ring 3): the memory and a selector; the mapping waits for ring 0 (ro_map, from the join). 0 = ok. */
@@ -668,7 +670,8 @@ static void ro_out(USHORT k)                       /* hand held slot k up, in it
 }
 
 /* Deliver the held frames that now follow on. The NDIS side has only a few receive buffers, freed when the context
- * hook runs, so a run stops while none is free (g_ro_wait) and the next frame of the TID resumes it. */
+ * hook runs, so a run stops while none is free (g_ro_wait). The hook resumes it once it has delivered the queued frames
+ * (rtl8188eu_ro_kick); otherwise the next frame of the TID does. */
 static void ro_follow(void)
 {
    USHORT k;
@@ -715,7 +718,7 @@ static void ro_frame(UCHAR *f, USHORT len, USHORT seq)
    }
    if (g_ro_n && g_ro_used[g_ro_head & (RO_SLOTS - 1)])
       ro_follow();                                 /* a run that stopped for want of a receive buffer */
-   if (g_ro_n && (long)(rtl8188eu_ms() - g_ro_t0) > (long)R21_RO_MS) {
+   if (g_ro_n && !g_ro_used[g_ro_head & (RO_SLOTS - 1)] && (long)(rtl8188eu_ms() - g_ro_t0) > (long)R21_RO_MS) {
       g_ro_stale++;                                /* the missing frame is not coming: go on from the first held one */
       for (j = 1; j < RO_SLOTS; j++)
          if (g_ro_used[(g_ro_head + j) & (RO_SLOTS - 1)])
@@ -732,12 +735,14 @@ static void ro_frame(UCHAR *f, USHORT len, USHORT seq)
       ro_advance((USHORT)((seq - (RO_SLOTS - 1)) & 0x0FFF));
       d = (USHORT)((seq - g_ro_head) & 0x0FFF);
    }
-   if (d == 0) {
+   if (d == 0 && !(ndis_is_open() && ndis_rx_avail() == 0)) {
       rx_data_body(f, len);
       g_ro_head = (USHORT)((g_ro_head + 1) & 0x0FFF);
       ro_follow();
       return;
    }
+   if (d == 0)
+      g_ro_full++;                                 /* in order, but no receive buffer is free: hold it, the hook sends it up */
    k = (USHORT)(seq & (RO_SLOTS - 1));
    if (g_ro_used[k]) {                             /* a copy of a frame already held */
       g_ro_drop++;
@@ -772,6 +777,31 @@ static void ro_bar(UCHAR *f, USHORT len)
    g_ro_bar++;
    ssn = (USHORT)((f[18] | (f[19] << 8)) >> 4);
    ro_advance(ssn);
+}
+
+/* From the context hook (rt_ndis.c), once it has delivered the queued frames and so freed receive buffers: resume a
+ * release that stopped for want of one. Interrupts stay off while the receive path lock is held, so the USB completion
+ * cannot run in between on this CPU; on another CPU it waits for the lock (at most a window of frames). If the
+ * completion holds the lock, the next frame resumes the run instead. Returns 1 when frames went up. */
+int rtl8188eu_ro_kick(void)
+{
+   USHORT fl, rel;
+
+   if (!g_ro_on || !g_ro_n || !g_ro_used[g_ro_head & (RO_SLOTS - 1)] || ndis_rx_avail() == 0)
+      return 0;
+   fl = rt_irq_save();
+   if (rt_lock_try(&g_rx_owner, (USHORT)(rt_cpu_id() + 1))) {
+      rt_irq_restore(fl);
+      return 0;
+   }
+   rel = g_ro_rel;
+   if (g_ro_on)
+      ro_follow();
+   rel = (USHORT)(g_ro_rel - rel);
+   rt_lock_release(&g_rx_owner);
+   rt_irq_restore(fl);
+   g_ro_kick = (USHORT)(g_ro_kick + rel);
+   return rel != 0;
 }
 
 static void ro_stop(void)                          /* the agreement ended: everything held goes up, in order */
@@ -1263,7 +1293,7 @@ static USHORT rx_read(usb_dev_t *dev, UCHAR ep, USHORT tmo_ms)
 /* Completion context (task time, must not block): append to the stream and parse. */
 void rtl_rx_feed(UCHAR *buf, USHORT n)
 {
-   USHORT i;
+   USHORT i, held;
 
    g_dg_feeds++;
    if (n > g_dg_maxn) g_dg_maxn = n;
@@ -1277,7 +1307,10 @@ void rtl_rx_feed(UCHAR *buf, USHORT n)
    for (i = 0; i < n; i++)
       g_acc[g_accn + i] = buf[i];
    g_accn = (USHORT)(g_accn + n);
+   held = rt_lock_acquire(&g_rx_owner, (USHORT)(rt_cpu_id() + 1));   /* against rtl8188eu_ro_kick on another CPU */
    rx_parse();
+   if (!held)
+      rt_lock_release(&g_rx_owner);
 }
 
 void rtl8188eu_rx_engine_start(usb_dev_t *dev)
