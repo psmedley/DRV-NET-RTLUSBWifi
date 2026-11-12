@@ -38,7 +38,7 @@
   10.24.7): frames ahead of a missing one are held, up to 8, and go up in sequence order once it arrives. With no
   timer in the driver, held frames are also released (skipping the gap) when the window has to slide, when the
   access point sends a Block Ack Request, and when a frame arrives while the oldest held one has waited more than
-  `R21_RO_MS` (20 ms). The held frames live in 12.8 KB of physical memory allocated at INIT, outside the data
+  `R21_RO_MS` (20 ms at first, now 100). The held frames live in 12.8 KB of physical memory allocated at INIT, outside the data
   segment, which is nearly full. A release pauses while no NDIS receive buffer is free and resumes with the next
   frame. New read-out line `RO HELD= REL= SKIP= STALE= BAR= LATE= DROP= MAX= WAIT=`.
   Third test (5 GHz, reorder buffer on): 2.99 MB/s, the best so far (Windows 3.4-3.8). Every held frame went up
@@ -59,6 +59,10 @@
   the next frame (`rtl8188eu_ro_kick`, under a receive path lock against the USB completion, with interrupts off),
   and an in-order frame that finds no buffer is held in the reorder buffer instead of dropped. New read-out fields
   `KICK=` (frames the hook sent up) and `FULL=` (in-order frames held for want of a buffer).
+  Sixth test (`ba-kick`): 3.29 MB/s on 5 GHz and 2.89 on 2.4 GHz, with no frame dropped for want of a buffer. A
+  slower 2.4 GHz run (about 2.5, dropping to 1.9) showed our own frames queuing in the chip for up to 97 ms (a busy
+  channel), and every gap the reorder buffer gave up on arrived later after all (`LATE=14`, `SKIP=14`). So a missing
+  frame is now waited for up to 100 ms (`R21_RO_MS`, was 20), the value Linux mac80211 uses.
 
 ## 0.1.4a4 (2026-11-09)
 

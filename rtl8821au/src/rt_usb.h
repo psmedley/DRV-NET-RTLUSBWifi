@@ -474,7 +474,8 @@ extern USHORT g_r21_h2c_busy;
 #define R21_BA          1
 #define R21_BA_WIN      16      /* a power of two: the reorder buffer's slot count (rtl_rx.c, RO_SLOTS) */
 #define R21_AMPDU_PARAM 0x01    /* maximum A-MPDU 16 KB, no minimum spacing */
-#define R21_RO_MS       20      /* reorder buffer: a held frame older than this is given up on (rtl_rx.c, ro_frame) */
+#define R21_RO_MS       100     /* reorder buffer: a missing frame is given up on after this (rtl_rx.c, ro_frame). Was 20: on a
+                                  * busy 2.4 GHz channel every gap given up on arrived later (LATE = SKIP). Linux mac80211: 100 ms */
 int    rtl8188eu_ro_alloc(void);                  /* rtl_rx.c: INIT, the reorder buffer's memory (0 = ok) */
 extern USHORT g_ro_held, g_ro_rel, g_ro_skip, g_ro_stale, g_ro_bar, g_ro_late, g_ro_drop, g_ro_wait, g_ro_kick, g_ro_full;
 int    rtl8188eu_ro_kick(void);                   /* rtl_rx.c: from the context hook, resume a paused reorder release */
@@ -493,7 +494,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "ba-kick"
+#define DRV_BUILD     "ba-ro100"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
