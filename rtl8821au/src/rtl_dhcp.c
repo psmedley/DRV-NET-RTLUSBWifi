@@ -362,6 +362,24 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" TID="); put_dec(g_ba_tid);
       put_s(" AMSDU="); put_dec(g_amsdu_n); put_s("/"); put_dec(g_amsdu_sub); put_s("/"); put_dec(g_amsdu_bad);   /* frames / subframes / dropped */
       put_s("\r\n");
+      put_s("BAACC="); put_dec(g_r21_ba); put_s(" BAON=");        /* Block Ack receive: switch, TIDs with an agreement */
+      put_dec(rtl8188eu_ba_on());                                  /* (bit n = TID n); frames of those TIDs, out of     */
+      put_s(" BARX="); put_dec(g_ba_rx); put_s(" OOO="); put_dec(g_ba_ooo);   /* order, sequence gaps, duplicates */
+      put_s(" GAP="); put_dec(g_ba_gap); put_s(" DUPW="); put_dec(g_ba_dupw);  /* caught by the window, DELBAs   */
+      put_s(" DELBA="); put_dec(g_ba_del);
+      put_s("\r\n");
+      put_s("AGG ALL="); put_dec(g_agg_all); put_s(" ME="); put_dec(g_agg_me);   /* frames from an A-MPDU (any / to us); */
+      put_s(" QOS="); put_dec(g_dq_qos); put_s(" PLAIN="); put_dec(g_dq_plain);   /* data to us: QoS / plain; QoS by TID */
+      put_s(" TID=");
+      for (q = 0; q < 8; q++) { put_dec(g_dq_tid[q]); if (q < 7) put_s("/"); }
+      put_s("\r\n");
+      put_s("RO HELD="); put_dec(g_ro_held); put_s(" REL="); put_dec(g_ro_rel);   /* reorder buffer (TID 0): frames held, */
+      put_s(" SKIP="); put_dec(g_ro_skip); put_s(" STALE="); put_dec(g_ro_stale); /* released in order, given up, timeouts, */
+      put_s(" BAR="); put_dec(g_ro_bar); put_s(" LATE="); put_dec(g_ro_late);     /* BARs, late frames, held copies dropped, */
+      put_s(" DROP="); put_dec(g_ro_drop); put_s(" MAX="); put_dec(g_ro_max);     /* most held at once, runs paused for     */
+      put_s(" WAIT="); put_dec(g_ro_wait);                                          /* want of a receive buffer,              */
+      put_s(" KICK="); put_dec(g_ro_kick); put_s(" FULL="); put_dec(g_ro_full);     /* sent up by the hook, in order but held */
+      put_s("\r\n");
    }
    {  /* scan table */
       USHORT n, q;
