@@ -369,6 +369,10 @@ int    rtl8188eu_eth_tx(usb_dev_t *dev, UCHAR FAR *eth, USHORT len);
 int    rtl8188eu_ndis_tx(UCHAR *eth, USHORT len);   /* async encrypted data TX (copies eth into a slot) */
 int    rtl8188eu_ndis_tx_slot(USHORT slot, USHORT len);   /* same, Ethernet frame already at TX_ETH_OFF in the slot */
 USHORT rtl8188eu_ndis_slot(void);                     /* a free TX slot for it (waits briefly), 0xFFFF = none */
+/* How long rtl8188eu_ndis_slot waits for a free slot before TransmitChain answers "out of resource" (0 = no wait).
+ * 6 ms until the transmit diagnostics build; uploads found all slots busy for 21% of the frames. */
+#define R21_TX_WAIT_MS 6
+extern USHORT g_ntx_retx, g_ntx_seg, g_ntx_flows, g_ntx_refuse, g_ntx_waitok, g_ntx_waitmax;   /* rtl_rx.c: read-out TXD */
 int    rtl8188eu_tx_ready(void);                     /* joined with a pairwise key: data frames can be sent */
 extern UCHAR g_ctlrate;                  /* rtl_rx.c */
 void   usb_tx_reset(void);                      /* rt_usb.c: free all TX slots (device detached) */
@@ -494,7 +498,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "ba-ro100"
+#define DRV_BUILD     "txdiag"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 

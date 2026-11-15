@@ -2517,8 +2517,53 @@ void rtl8188eu_tx_watchdog(usb_dev_t *dev)
    }
 }
 
-/* A free TX slot for an outgoing NDIS frame. All slots in flight: a slot frees within ~3 ms, so wait for it here
- * instead of making the protocol retry in a tight loop. 0xFFFF = none. */
+/* Transmit diagnostics (read-out line TXD), for uploads:
+ *   g_ntx_retx   TCP data segments the protocol stack sent again (their end is not beyond the highest one sent on the
+ *                flow), out of g_ntx_seg; the flow followed is the one of the latest data segment (g_ntx_flows changes)
+ *   g_ntx_refuse TransmitChain answered "out of resource" (rt_ndis.c), so the protocol has to retry the frame
+ *   g_ntx_waitok / g_ntx_waitmax  slot waits that ended with a free slot, and the longest of them (ms)
+ * Unlocked: TransmitChain can run on several CPUs at once, so the counts are approximate. */
+USHORT g_ntx_retx, g_ntx_seg, g_ntx_flows, g_ntx_refuse, g_ntx_waitok, g_ntx_waitmax;
+static UCHAR g_tcp_key[8];                         /* destination IP address and the two ports of the flow followed */
+static ULONG g_tcp_hi;                             /* the highest sequence number + length sent on it */
+
+static void tx_tcp_diag(UCHAR *eth, USHORT len)
+{
+   USHORT ihl, iplen, thl, pay, i;
+   UCHAR  *t;
+   ULONG  end;
+
+   ihl = (USHORT)((eth[14] & 0x0F) << 2);
+   if (ihl < 20 || len < (USHORT)(14 + ihl + 20))
+      return;
+   t = eth + 14 + ihl;
+   iplen = (USHORT)((eth[16] << 8) | eth[17]);
+   thl = (USHORT)((t[12] >> 4) << 2);
+   if (thl < 20 || iplen <= (USHORT)(ihl + thl))
+      return;                                      /* no payload: a pure ACK */
+   pay = (USHORT)(iplen - ihl - thl);
+   end = (((ULONG)t[4] << 24) | ((ULONG)t[5] << 16) | ((ULONG)t[6] << 8) | (ULONG)t[7]) + pay;
+   g_ntx_seg++;
+   for (i = 0; i < 4; i++)
+      if (g_tcp_key[i] != eth[30 + i] || g_tcp_key[4 + i] != t[i])
+         break;
+   if (i < 4) {                                    /* another flow: follow this one from here */
+      for (i = 0; i < 4; i++) {
+         g_tcp_key[i] = eth[30 + i];
+         g_tcp_key[4 + i] = t[i];
+      }
+      g_tcp_hi = end;
+      g_ntx_flows++;
+      return;
+   }
+   if ((long)(end - g_tcp_hi) <= 0L)
+      g_ntx_retx++;                                /* nothing beyond what was already sent: a retransmission */
+   else
+      g_tcp_hi = end;
+}
+
+/* A free TX slot for an outgoing NDIS frame. All slots in flight: wait up to R21_TX_WAIT_MS for one here instead of
+ * making the protocol retry at once (0 = do not wait). 0xFFFF = none. */
 USHORT rtl8188eu_ndis_slot(void)
 {
    USHORT slot = usb_tx_alloc();
@@ -2527,18 +2572,24 @@ USHORT rtl8188eu_ndis_slot(void)
       g_ntx_stuck++;
       return 0xFFFF;                               /* nothing has completed for a second: do not spin */
    }
-   if (slot == 0xFFFF) {
+   if (slot == 0xFFFF && R21_TX_WAIT_MS > 0) {
       ULONG  t0 = rtl8188eu_ms();
       USHORT spin;
 
-      for (spin = 0; spin < 30000U && slot == 0xFFFF; spin++) {
-         if ((spin & 255) == 255 && (long)(rtl8188eu_ms() - t0) > 6L)
+      for (spin = 0; spin < 65000U && slot == 0xFFFF; spin++) {
+         if ((spin & 255) == 255 && (long)(rtl8188eu_ms() - t0) > (long)R21_TX_WAIT_MS)
             break;
          slot = usb_tx_alloc();
       }
-      if (slot == 0xFFFF)
-         g_ntx_noslot++;
+      if (slot != 0xFFFF) {
+         USHORT w = (USHORT)(rtl8188eu_ms() - t0);
+
+         g_ntx_waitok++;
+         if (w > g_ntx_waitmax) g_ntx_waitmax = w;
+      }
    }
+   if (slot == 0xFFFF)
+      g_ntx_noslot++;
    return slot;
 }
 
@@ -2571,7 +2622,7 @@ int rtl8188eu_ndis_tx_slot(USHORT slot, USHORT len)
    if (len >= 14) {
       if (eth[12] == 0x08 && eth[13] == 0x06) g_ntx_arp++;
       else if (eth[12] == 0x08 && eth[13] == 0x00 && len >= 34) {
-         if (eth[23] == 6)       { g_ntx_tcp++; if (len <= 66) g_ntx_ack++; }
+         if (eth[23] == 6)       { g_ntx_tcp++; if (len <= 66) g_ntx_ack++; tx_tcp_diag(eth, len); }
          else if (eth[23] == 17) g_ntx_udp++;
          else if (eth[23] == 1)  g_ntx_icmp++;
          else                    g_ntx_other++;
