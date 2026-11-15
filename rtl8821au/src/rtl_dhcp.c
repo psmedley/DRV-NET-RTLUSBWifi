@@ -380,6 +380,11 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" WAIT="); put_dec(g_ro_wait);                                          /* want of a receive buffer,              */
       put_s(" KICK="); put_dec(g_ro_kick); put_s(" FULL="); put_dec(g_ro_full);     /* sent up by the hook, in order but held */
       put_s("\r\n");
+      put_s("TXD RETX="); put_dec(g_ntx_retx); put_s(" SEG="); put_dec(g_ntx_seg);  /* transmit: TCP segments sent again / */
+      put_s(" FLOWS="); put_dec(g_ntx_flows); put_s(" REFUSE="); put_dec(g_ntx_refuse);   /* all, flow changes, refused, */
+      put_s(" WAITOK="); put_dec(g_ntx_waitok); put_s(" WAITMAX="); put_dec(g_ntx_waitmax);  /* waits that got a slot, */
+      put_s(" WAITMS="); put_dec(R21_TX_WAIT_MS);                                  /* the longest (ms), the switch  */
+      put_s("\r\n");
    }
    {  /* scan table */
       USHORT n, q;

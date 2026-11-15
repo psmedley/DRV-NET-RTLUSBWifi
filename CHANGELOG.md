@@ -63,6 +63,13 @@
   slower 2.4 GHz run (about 2.5, dropping to 1.9) showed our own frames queuing in the chip for up to 97 ms (a busy
   channel), and every gap the reorder buffer gave up on arrived later after all (`LATE=14`, `SKIP=14`). So a missing
   frame is now waited for up to 100 ms (`R21_RO_MS`, was 20), the value Linux mac80211 uses.
+* Transmit diagnostics, for uploads. In a 150 MB upload over HTTP (5 GHz) the speed started near 3 MB/s and
+  averaged 0.68 MB/s; all 7 USB transmit slots were busy for 21% of the frames the protocol stack sent
+  (`NTXNOSLOT`), and TransmitChain then answered "out of resource". New read-out line
+  `TXD RETX= SEG= FLOWS= REFUSE= WAITOK= WAITMAX= WAITMS=`: TCP data segments the stack sent again, out of all
+  data segments (for the flow of the latest one; flow changes counted), the "out of resource" answers, slot waits
+  that ended with a free slot and the longest one (ms), and `R21_TX_WAIT_MS`, the new switch for how long
+  TransmitChain waits for a slot (6 ms as before; 0 = no wait).
 
 ## 0.1.4a4 (2026-11-09)
 

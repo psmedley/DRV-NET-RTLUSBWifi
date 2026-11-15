@@ -420,6 +420,7 @@ WORD __cdecl ndis_c_transmit(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
          gSST.trFrHW++;                                  /* the dongle stopped taking frames: drop, never make the */
          return NDIS_SUCCESS;                            /* protocol retry in a loop (that freezes the machine)    */
       }
+      g_ntx_refuse++;
       return NDIS_OUT_OF_RESOURCE;                       /* all transmit slots busy: protocol retries */
    }
    g = usb_tx_buf(slot) + TX_ETH_OFF;
@@ -468,6 +469,7 @@ WORD __cdecl ndis_c_transmit(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
       if (mc)
          gSST.trBCFrames++;
    } else if (r == -2) {
+      g_ntx_refuse++;
       rc = NDIS_OUT_OF_RESOURCE;                         /* could not be queued now: protocol retries */
    } else {
       gSST.trFrHW++;
