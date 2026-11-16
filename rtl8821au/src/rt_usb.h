@@ -338,7 +338,8 @@ extern int    g_hw_failed;     /* init failed; needs a re-plug before retrying  
 #define TRACE_DATA 0      /* 1 = per-frame serial trace (T k f d x r + counter dump): costs ~5 ms per frame, debugging only */
 #define RUN_TXPOWER 0     /* 1 = per-rate TX power from the eFuse/Windows offsets (measured WORSE at close range: off) */
 #define RUN_LED    1      /* drive the dongle LED: slow blink while searching, steady on when joined, flicker on traffic */
-#define DBG_ADMIN  0      /* 1 = debug channel may write chip registers and force a re-init (development only; 0 for releases) */
+#define DBG_ADMIN  1      /* 1 = debug channel may write chip registers and force a re-init (development only; 0 for releases).
+                            * 1 in the txrate test build: the 'rate N' command pins the data rate at runtime */
 #define SHOW_RSSI  1      /* print RSSI in the COM1 network list */
 void   rtl8188eu_iqk_set(usb_dev_t *dev, int on);
 int    rtl8188eu_llt_init(usb_dev_t *dev);       /* LLT only (rtl_rx.c)      */
@@ -500,7 +501,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "txqueue"
+#define DRV_BUILD     "txrate"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 

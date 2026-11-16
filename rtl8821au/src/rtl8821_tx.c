@@ -24,6 +24,7 @@
 #define QSLT_MGNT      0x12
 #define RATEID_IDX_G   7
 #define RATEID_IDX_B   8
+#define RATEID_IDX_GN_N1SS 5                       /* HT, one stream (rate codes 0x0C-0x13 = MCS 0-7) */
 
 USHORT g_r21_txok, g_r21_txfail, g_r21_txlast;
 
@@ -50,7 +51,7 @@ void rtl8821_fill_desc(UCHAR *b, USHORT n, int bcast, UCHAR qsel, int sec, UCHAR
    v = (ULONG)n | ((ULONG)TXDESC_SIZE << 16) | 0x0C000000UL | 0x80000000UL;        /* LS | FS | OWN */
    if (bcast) v |= 0x01000000UL;                                                    /* BMC */
    put32le(b + 0, v);
-   v = (ULONG)(qsel == QSLT_MGNT ? 1 : 1) | ((ULONG)qsel << 8) | ((ULONG)(rate < 4 ? RATEID_IDX_B : RATEID_IDX_G) << 16);
+   v = (ULONG)(qsel == QSLT_MGNT ? 1 : 1) | ((ULONG)qsel << 8) | ((ULONG)(rate >= 0x0C ? RATEID_IDX_GN_N1SS : (rate < 4 ? RATEID_IDX_B : RATEID_IDX_G)) << 16);
    if (sec) v |= 0x00C00000UL;                                                      /* SEC_TYPE = AES */
    put32le(b + 4, v);
    if (rpt) put32le(b + 8, 0x00080000UL);                                           /* SPE_RPT: TX report (C2H) after sending */
