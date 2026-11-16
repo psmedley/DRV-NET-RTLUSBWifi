@@ -360,6 +360,7 @@ void   rtl8188eu_rx_engine_start(usb_dev_t *dev);        /* always-on async bulk
 void   rtl8188eu_dbg(void);                              /* counter dump on COM1 */
 void   rtl8188eu_print_nets(void);                      /* debug: dump the scan table (with RSSI) on COM1 */
 UCHAR  rtl8188eu_cur_rate(void);                       /* debug: current data rate code */
+extern UCHAR g_txrate, g_txrate_auto, g_xr_raw[8];     /* rtl_rx.c: read-out TXR (pinned rate, adapting, last TX report) */
 void   rtl8188eu_set_txpower(usb_dev_t *dev, UCHAR channel);   /* per-rate TX power from the eFuse (rtw_reg.c) */
 signed char rtl8188eu_rssi_of(UCHAR *bssid);          /* smoothed dBm of a BSS from the scan table, 0 = unknown */
 void   rtl8188eu_leave(usb_dev_t *dev);
@@ -501,7 +502,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "txrate"
+#define DRV_BUILD     "txrate2"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 

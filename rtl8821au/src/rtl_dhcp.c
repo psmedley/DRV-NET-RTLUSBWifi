@@ -389,6 +389,10 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" FULL="); put_dec(g_tq_full); put_s(" LOST="); put_dec(g_tq_lost);        /* confirmed, queue full, lost,  */
       put_s(" MAX="); put_dec(g_tq_max);                                            /* most queued at once           */
       put_s("\r\n");
+      put_s("TXR PIN="); put_h8(g_txrate); put_s(g_txrate_auto ? " AUTO=1 USE=" : " AUTO=0 USE=");   /* data rate: pinned code, */
+      put_h8(rtl8188eu_cur_rate()); put_s(" RPT=");                                 /* adapting, in use, last TX */
+      for (q = 0; q < 8; q++) put_h8(g_xr_raw[q]);                                    /* report bytes              */
+      put_s("\r\n");
    }
    {  /* scan table */
       USHORT n, q;

@@ -1063,6 +1063,7 @@ static int hdr_ok(USHORT pos)
  * TSF stamp of each frame and the host clock at the time the USB completion delivered it (max - min of
  * host_ms - tsf_ms: how much the delivery path stretches and shakes the arrival times). */
 USHORT g_xr_n, g_xr_retry, g_xr_retry_max, g_xr_q8, g_xr_q_max, g_xr_rate, g_xr_over, g_xr_big;
+UCHAR  g_xr_raw[8];                               /* the last TX report's bytes after the C2H header (read-out TXR) */
 USHORT g_rx_cls[6];                              /* CCK, OFDM 6-12, OFDM 18-24, OFDM 36-54, HT, VHT */
 static ULONG  g_tsf0, g_host0;
 static UCHAR  g_tsf_ref;
@@ -1168,6 +1169,8 @@ static void rx_c2h(UCHAR *c, USHORT n)
    }
    if (n < 8 || c[0] != 0x03)
       return;
+   for (q = 0; q < 8; q++)                           /* raw copy for the read-out (TXR RPT=) */
+      g_xr_raw[q] = (UCHAR)(q + 2 < n ? c[2 + q] : 0);
    retry = (USHORT)(c[2 + 2] & 0x3F);                /* data retry count */
    q = (USHORT)(c[2 + 3] | (c[2 + 4] << 8));         /* queue time, 256 us units */
    {
