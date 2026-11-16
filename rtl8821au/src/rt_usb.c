@@ -823,6 +823,8 @@ static void async_complete(RT_USBRB FAR *rb)
          if (rb->status != 0)
             g_tx_err++;
          usb_tx_release(slot);
+         if (ndis_tq_pending())
+            ndis_kick();                             /* frames wait in the transmit queue: the hook sends them now */
       }
    }
 }

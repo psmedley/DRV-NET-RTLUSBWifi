@@ -70,6 +70,13 @@
   data segments (for the flow of the latest one; flow changes counted), the "out of resource" answers, slot waits
   that ended with a free slot and the longest one (ms), and `R21_TX_WAIT_MS`, the new switch for how long
   TransmitChain waits for a slot (6 ms as before; 0 = no wait).
+* Transmit queue. With all USB transmit slots busy, waiting for one spins at ring 0 and held up the receive path
+  during uploads (receive delays up to 0.5 s, `TSFJIT`); not waiting (`R21_TX_WAIT_MS 0`) raised an upload from
+  0.68 to 1.00 MB/s, but TCP/IP then retried about every frame itself. Now such a frame is copied into a queue of 8
+  (physical memory, outside the data segment) and TransmitChain answers REQUEST_QUEUED; the context hook sends
+  queued frames in order as slots free (a slot's completion arms it) and calls the protocol's TransmitConfirm. Only
+  when the queue is full too is the answer "out of resource", as before. New read-out line
+  `TXQ QUEUED= CONF= FULL= LOST= MAX=`.
 
 ## 0.1.4a4 (2026-11-09)
 

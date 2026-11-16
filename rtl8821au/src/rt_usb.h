@@ -338,7 +338,8 @@ extern int    g_hw_failed;     /* init failed; needs a re-plug before retrying  
 #define TRACE_DATA 0      /* 1 = per-frame serial trace (T k f d x r + counter dump): costs ~5 ms per frame, debugging only */
 #define RUN_TXPOWER 0     /* 1 = per-rate TX power from the eFuse/Windows offsets (measured WORSE at close range: off) */
 #define RUN_LED    1      /* drive the dongle LED: slow blink while searching, steady on when joined, flicker on traffic */
-#define DBG_ADMIN  0      /* 1 = debug channel may write chip registers and force a re-init (development only; 0 for releases) */
+#define DBG_ADMIN  1      /* 1 = debug channel may write chip registers and force a re-init (development only; 0 for releases).
+                            * 1 in the txrate test build: the 'rate N' command pins the data rate at runtime */
 #define SHOW_RSSI  1      /* print RSSI in the COM1 network list */
 void   rtl8188eu_iqk_set(usb_dev_t *dev, int on);
 int    rtl8188eu_llt_init(usb_dev_t *dev);       /* LLT only (rtl_rx.c)      */
@@ -359,6 +360,7 @@ void   rtl8188eu_rx_engine_start(usb_dev_t *dev);        /* always-on async bulk
 void   rtl8188eu_dbg(void);                              /* counter dump on COM1 */
 void   rtl8188eu_print_nets(void);                      /* debug: dump the scan table (with RSSI) on COM1 */
 UCHAR  rtl8188eu_cur_rate(void);                       /* debug: current data rate code */
+extern UCHAR g_txrate, g_txrate_auto, g_xr_raw[8];     /* rtl_rx.c: read-out TXR (pinned rate, adapting, last TX report) */
 void   rtl8188eu_set_txpower(usb_dev_t *dev, UCHAR channel);   /* per-rate TX power from the eFuse (rtw_reg.c) */
 signed char rtl8188eu_rssi_of(UCHAR *bssid);          /* smoothed dBm of a BSS from the scan table, 0 = unknown */
 void   rtl8188eu_leave(usb_dev_t *dev);
@@ -487,6 +489,8 @@ extern UCHAR  g_ro_max;
 void   rtl8188eu_ba_tick(usb_dev_t *dev);         /* rtl_rx.c: answer a pending ADDBA request (task time, request lock) */
 void   rtl8188eu_ba_hook(void);                   /* rtl_rx.c: the same from the context hook, without blocking */
 int    ndis_kick(void);                           /* rt_ndis.c: arm the context hook (0 = no hook)                */
+int    ndis_tq_pending(void);                     /* rt_ndis.c: frames wait in the transmit queue                 */
+extern USHORT g_tq_queued, g_tq_conf, g_tq_full, g_tq_lost, g_tq_max;   /* rt_ndis.c: read-out TXQ */
 UCHAR  rtl8188eu_ht_state(void);                  /* rtl_rx.c: what the association response granted (read-out) */
 extern UCHAR  g_r21_ht, g_ba_tid, g_r21_ba;
 extern USHORT g_ba_rx, g_ba_ooo, g_ba_gap, g_ba_dupw, g_ba_del;
@@ -498,7 +502,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "txwait0"
+#define DRV_BUILD     "txrate2"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
