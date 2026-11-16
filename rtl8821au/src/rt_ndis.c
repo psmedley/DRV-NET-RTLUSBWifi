@@ -126,6 +126,8 @@ static USHORT               g_hook_ok;           /* 1 when the hook was allocate
 USHORT                      g_use_hook = 1;      /* 1 = deliver received frames from the context hook (debug "uh 1"), 0 = directly from the USB callback */
 USHORT                      g_hk_run, g_hk_maxq, g_hk_arm_fail;
 
+static void tq_alloc(void);                        /* the transmit queue's memory (below) */
+
 /* ---- registration with the Protocol Manager (init time) ---------------------- */
 USHORT ndis_init(void)
 {
@@ -136,6 +138,7 @@ USHORT ndis_init(void)
 
    gCCT.moduleDS = rt_getds();
    rt_dh_alloc_gdt(&g_txsel, 1);                   /* used to read physical TransmitChain data blocks */
+   tq_alloc();                                     /* the transmit queue's memory */
    g_hook_ok = (USHORT)(rt_dh_alloc_ctxhook(rt_hook_offset(), &g_hook) == 0);   /* receive delivery at task time */
    for (i = 0; i < 6; i++)
       gSCT.permStnAddr[i] = gSCT.currStnAddr[i] = g_mymac[i];
@@ -399,53 +402,30 @@ WORD __cdecl ndis_c_genreq(WORD protID, WORD reqHandle, WORD param1, DWORD param
    return rc;
 }
 
-/* Transmit: gather the buffer chain into one Ethernet frame and queue it for the radio. The data is copied before
- * returning, so SUCCESS (no TransmitConfirm) is the right answer. */
-WORD __cdecl ndis_c_transmit(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
+/* Gather a TransmitChain buffer chain (immediate data + data blocks) into one Ethernet frame at dst. Returns its length,
+ * or 0xFFFF when it is larger than an Ethernet frame (or the physical-block selector is held by this CPU: re-entered). */
+static USHORT tx_gather(PTCBD pTCBufferD, PVOID dst)
 {
-   WORD   rc = NDIS_SUCCESS;
-   USHORT n = 0, i, k, slot, fl;
-   UCHAR  *g, mc;
-   int    r, bad = 0;
+   UCHAR FAR *g = (UCHAR FAR *)dst;
+   USHORT n = 0, i, k, fl;
 
-   if (!(gSST.status & SSTATUS_OPEN))
-      return NDIS_INVALID_FUNCTION;
-   if (!rtl8188eu_tx_ready()) {
-      gSST.trFrHW++;                                     /* no connection / keys yet: the frame is lost */
-      return NDIS_SUCCESS;
-   }
-   slot = rtl8188eu_ndis_slot();
-   if (slot == 0xFFFF) {
-      if (rtl8188eu_tx_stuck()) {
-         gSST.trFrHW++;                                  /* the dongle stopped taking frames: drop, never make the */
-         return NDIS_SUCCESS;                            /* protocol retry in a loop (that freezes the machine)    */
-      }
-      g_ntx_refuse++;
-      return NDIS_OUT_OF_RESOURCE;                       /* all transmit slots busy: protocol retries */
-   }
-   g = usb_tx_buf(slot) + TX_ETH_OFF;
    if (pTCBufferD->immedLen) {
       if (pTCBufferD->immedLen > MAX_FRAME_SIZE)
-         bad = 1;
-      else {
-         rt_movmem((PVOID)g, (PVOID)pTCBufferD->pImmed, pTCBufferD->immedLen);
-         n = pTCBufferD->immedLen;
-      }
+         return 0xFFFF;
+      rt_movmem((PVOID)g, (PVOID)pTCBufferD->pImmed, pTCBufferD->immedLen);
+      n = pTCBufferD->immedLen;
    }
-   for (i = 0; !bad && i < pTCBufferD->dbCount && i < MAX_DATA_BLOCK_COUNT; i++) {
+   for (i = 0; i < pTCBufferD->dbCount && i < MAX_DATA_BLOCK_COUNT; i++) {
       k = pTCBufferD->db[i].dataLen;
-      if ((USHORT)(n + k) > MAX_FRAME_SIZE || (USHORT)(n + k) < n) {
-         bad = 1;
-         break;
-      }
+      if ((USHORT)(n + k) > MAX_FRAME_SIZE || (USHORT)(n + k) < n)
+         return 0xFFFF;
       if (pTCBufferD->db[i].ptrType == 0) {            /* physical address: map it through our GDT selector */
          ULONG ph = *(ULONG FAR *)&pTCBufferD->db[i].pData;
 
          fl = rt_irq_save();
          if (rt_lock_acquire(&g_txsel_lock, (USHORT)(rt_cpu_id() + 1))) {
             rt_irq_restore(fl);                         /* this CPU already holds it (re-entered): do not wait */
-            bad = 1;
-            break;
+            return 0xFFFF;
          }
          rt_dh_phys_to_gdt(ph, k, g_txsel);
          rt_movmem((PVOID)(g + n), MAKEP(g_txsel, 0), k);
@@ -456,25 +436,190 @@ WORD __cdecl ndis_c_transmit(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
       }
       n = (USHORT)(n + k);
    }
-   if (bad) {
-      usb_tx_release(slot);
-      gSST.trFrHW++;                                     /* larger than an Ethernet frame (or re-entered): lost */
-      return NDIS_SUCCESS;
-   }
-   mc = (UCHAR)(g[0] & STATION_ADDR_MC);                 /* the slot is rewritten by the send: keep the group bit */
-   r = rtl8188eu_ndis_tx_slot(slot, n);                  /* releases the slot itself when it fails */
+   return n;
+}
+
+/* Send the Ethernet frame (n bytes) already at TX_ETH_OFF in slot, and count it. 0 = queued to the dongle, -2 = not
+ * queued now (the slot is released: retry), -1 = lost. */
+static int tx_send(USHORT slot, USHORT n)
+{
+   UCHAR mc = (UCHAR)(usb_tx_buf(slot)[TX_ETH_OFF] & STATION_ADDR_MC);   /* the send rewrites the slot */
+   int   r  = rtl8188eu_ndis_tx_slot(slot, n);         /* releases the slot itself when it fails */
+
    if (r == 0) {
       gSST.trFrames++;
       gSST.trBytes += n;
       if (mc)
          gSST.trBCFrames++;
-   } else if (r == -2) {
-      g_ntx_refuse++;
-      rc = NDIS_OUT_OF_RESOURCE;                         /* could not be queued now: protocol retries */
-   } else {
+   } else if (r != -2) {
       gSST.trFrHW++;
    }
-   return rc;
+   return r;
+}
+
+/* ---- transmit queue ----------------------------------------------------------------------------------------------
+ * When all USB transmit slots are busy, TransmitChain used to answer "out of resource", and the protocol retried. Waiting
+ * for a slot instead spins at ring 0 and holds up the receive path (the TCP ACKs of an upload); answering at once makes
+ * the protocol retry in its own loop. Instead the frame is copied into this queue and TransmitChain answers
+ * REQUEST_QUEUED. The context hook moves queued frames into slots as they free (a slot's completion arms it), sends
+ * them in order and calls the protocol's TransmitConfirm. A frame with request handle 0 wants no confirmation: it is
+ * queued the same way and answered SUCCESS (the data is already copied).
+ * The frames live in physical memory from INIT (TQ_N x TQ_SLOT), outside the data segment, mapped through a GDT
+ * selector on first use (ring 0). Only used with the context hook; without it, or if the memory is missing, the old
+ * "out of resource" answer stays. */
+#define TQ_N     8                                     /* a power of two */
+#define TQ_SLOT  1520                                  /* an Ethernet frame (MAX_FRAME_SIZE) */
+static ULONG  g_tq_phys;
+static USHORT g_tq_sel;
+static UCHAR  g_tq_alloc, g_tq_mapped;
+static USHORT g_tq_len[TQ_N], g_tq_req[TQ_N], g_tq_prot[TQ_N];
+static USHORT g_tq_h, g_tq_t;                          /* next to send, next free */
+static volatile USHORT g_tq_n;
+static USHORT g_tq_lock;                               /* owner (CPU + 1) of the queue */
+USHORT        g_tq_queued, g_tq_conf, g_tq_full, g_tq_lost, g_tq_max;   /* read-out TXQ */
+
+static void tq_alloc(void)                             /* INIT (ring 3) */
+{
+   if (rt_dh_alloc_phys((ULONG)TQ_N * TQ_SLOT, 0, &g_tq_phys) == 0 && rt_dh_alloc_gdt(&g_tq_sel, 1) == 0)
+      g_tq_alloc = 1;
+}
+
+static int tq_usable(void)
+{
+   if (!g_tq_alloc || !g_hook_ok || !g_use_hook)
+      return 0;
+   if (!g_tq_mapped && rt_dh_phys_to_gdt(g_tq_phys, (USHORT)(TQ_N * TQ_SLOT), g_tq_sel) == 0)
+      g_tq_mapped = 1;
+   return g_tq_mapped;
+}
+
+int ndis_tq_pending(void)                              /* rt_usb.c: a slot completed; arm the hook if frames wait */
+{
+   return g_tq_n != 0;
+}
+
+static WORD tq_put(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
+{
+   USHORT fl, i, n;
+
+   fl = rt_irq_save();
+   if (rt_lock_acquire(&g_tq_lock, (USHORT)(rt_cpu_id() + 1))) {
+      rt_irq_restore(fl);                              /* re-entered on this CPU */
+      g_ntx_refuse++;
+      return NDIS_OUT_OF_RESOURCE;
+   }
+   if (g_tq_n >= TQ_N) {
+      rt_lock_release(&g_tq_lock);
+      rt_irq_restore(fl);
+      g_tq_full++;
+      g_ntx_refuse++;
+      return NDIS_OUT_OF_RESOURCE;                     /* the queue is full too: the protocol retries, as before */
+   }
+   i = g_tq_t;
+   n = tx_gather(pTCBufferD, MAKEP(g_tq_sel, i * TQ_SLOT));
+   if (n == 0xFFFF) {
+      rt_lock_release(&g_tq_lock);
+      rt_irq_restore(fl);
+      gSST.trFrHW++;
+      return NDIS_SUCCESS;
+   }
+   g_tq_len[i]  = n;
+   g_tq_req[i]  = reqHandle;
+   g_tq_prot[i] = protID;
+   g_tq_t = (USHORT)((i + 1) & (TQ_N - 1));
+   g_tq_n++;
+   if (g_tq_n > g_tq_max)
+      g_tq_max = g_tq_n;
+   rt_lock_release(&g_tq_lock);
+   rt_irq_restore(fl);
+   g_tq_queued++;
+   ndis_kick();                                        /* a slot may have freed meanwhile */
+   return reqHandle ? NDIS_REQUEST_QUEUED : NDIS_SUCCESS;
+}
+
+/* From the context hook: send queued frames while slots are free, oldest first, and confirm them. */
+static void tq_drain(void)
+{
+   USHORT slot, fl, i, len, req, prot;
+   int    lost;
+
+   while (g_tq_n) {
+      lost = !rtl8188eu_tx_ready() || rtl8188eu_tx_stuck();   /* link gone, or the dongle stopped taking frames */
+      slot = 0xFFFF;
+      if (!lost) {
+         slot = usb_tx_alloc();
+         if (slot == 0xFFFF)
+            return;                                    /* the next slot completion arms the hook again */
+      }
+      fl = rt_irq_save();
+      if (rt_lock_try(&g_tq_lock, (USHORT)(rt_cpu_id() + 1))) {
+         rt_irq_restore(fl);                           /* a TransmitChain is adding a frame: it arms the hook again */
+         if (slot != 0xFFFF)
+            usb_tx_release(slot);
+         return;
+      }
+      i    = g_tq_h;
+      len  = g_tq_len[i];
+      req  = g_tq_req[i];
+      prot = g_tq_prot[i];
+      if (slot != 0xFFFF)
+         rt_movmem((PVOID)(usb_tx_buf(slot) + TX_ETH_OFF), MAKEP(g_tq_sel, i * TQ_SLOT), len);
+      g_tq_h = (USHORT)((i + 1) & (TQ_N - 1));
+      g_tq_n--;
+      rt_lock_release(&g_tq_lock);
+      rt_irq_restore(fl);
+      if (lost || tx_send(slot, len) != 0) {
+         g_tq_lost++;                                  /* confirmed all the same: the protocol must get its buffers back */
+         if (lost)
+            gSST.trFrHW++;
+      }
+      if (req) {
+         g_tq_conf++;
+         (*gProtLDT.pTransmitConfirm)(prot, gCCT.moduleID, req, NDIS_SUCCESS, gProtCCT.moduleDS);
+      }
+   }
+}
+
+/* Transmit: gather the buffer chain into one Ethernet frame and queue it for the radio. With a free slot (and nothing
+ * queued ahead of it) the data is copied into the slot before returning, so SUCCESS (no TransmitConfirm) is the right
+ * answer. Otherwise the frame goes into the transmit queue (REQUEST_QUEUED, confirmed by the hook). */
+WORD __cdecl ndis_c_transmit(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
+{
+   USHORT n, slot;
+   int    r, tq;
+
+   if (!(gSST.status & SSTATUS_OPEN))
+      return NDIS_INVALID_FUNCTION;
+   if (!rtl8188eu_tx_ready()) {
+      gSST.trFrHW++;                                     /* no connection / keys yet: the frame is lost */
+      return NDIS_SUCCESS;
+   }
+   tq = tq_usable();
+   slot = (tq && g_tq_n) ? 0xFFFF : rtl8188eu_ndis_slot();   /* frames already queued go first */
+   if (slot == 0xFFFF) {
+      if (rtl8188eu_tx_stuck()) {
+         gSST.trFrHW++;                                  /* the dongle stopped taking frames: drop, never make the */
+         return NDIS_SUCCESS;                            /* protocol retry in a loop (that freezes the machine)    */
+      }
+      if (tq)
+         return tq_put(protID, reqHandle, pTCBufferD);
+      g_ntx_refuse++;
+      return NDIS_OUT_OF_RESOURCE;                       /* all transmit slots busy: protocol retries */
+   }
+   n = tx_gather(pTCBufferD, (PVOID)(usb_tx_buf(slot) + TX_ETH_OFF));
+   if (n == 0xFFFF) {
+      usb_tx_release(slot);
+      gSST.trFrHW++;                                     /* larger than an Ethernet frame (or re-entered): lost */
+      return NDIS_SUCCESS;
+   }
+   r = tx_send(slot, n);
+   if (r == -2) {
+      if (tq)
+         return tq_put(protID, reqHandle, pTCBufferD);   /* the TX lock was busy: queue it instead */
+      g_ntx_refuse++;
+      return NDIS_OUT_OF_RESOURCE;                       /* could not be queued now: protocol retries */
+   }
+   return NDIS_SUCCESS;
 }
 
 WORD __cdecl ndis_c_transfer(PUSHORT pBytesCopied, WORD frameOffset, PTDBD pTDBufferD)
@@ -559,6 +704,7 @@ void __cdecl ndis_hook_c(void)
 {
    g_hk_run++;
    rtl8188eu_ba_hook();                            /* a pending ADDBA decline goes out first (task time, does not block) */
+   tq_drain();                                     /* queued transmit frames into free slots, then their TransmitConfirm */
    do {
       while (g_q_tail != g_q_head) {
          USHORT i = (USHORT)(g_q_tail % RXP_N), h, len;

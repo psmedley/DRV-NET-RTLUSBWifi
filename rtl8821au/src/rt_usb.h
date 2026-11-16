@@ -487,6 +487,8 @@ extern UCHAR  g_ro_max;
 void   rtl8188eu_ba_tick(usb_dev_t *dev);         /* rtl_rx.c: answer a pending ADDBA request (task time, request lock) */
 void   rtl8188eu_ba_hook(void);                   /* rtl_rx.c: the same from the context hook, without blocking */
 int    ndis_kick(void);                           /* rt_ndis.c: arm the context hook (0 = no hook)                */
+int    ndis_tq_pending(void);                     /* rt_ndis.c: frames wait in the transmit queue                 */
+extern USHORT g_tq_queued, g_tq_conf, g_tq_full, g_tq_lost, g_tq_max;   /* rt_ndis.c: read-out TXQ */
 UCHAR  rtl8188eu_ht_state(void);                  /* rtl_rx.c: what the association response granted (read-out) */
 extern UCHAR  g_r21_ht, g_ba_tid, g_r21_ba;
 extern USHORT g_ba_rx, g_ba_ooo, g_ba_gap, g_ba_dupw, g_ba_del;
@@ -498,7 +500,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.4a4"
-#define DRV_BUILD     "txwait0"
+#define DRV_BUILD     "txqueue"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 

@@ -385,6 +385,10 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" WAITOK="); put_dec(g_ntx_waitok); put_s(" WAITMAX="); put_dec(g_ntx_waitmax);  /* waits that got a slot, */
       put_s(" WAITMS="); put_dec(R21_TX_WAIT_MS);                                  /* the longest (ms), the switch  */
       put_s("\r\n");
+      put_s("TXQ QUEUED="); put_dec(g_tq_queued); put_s(" CONF="); put_dec(g_tq_conf);   /* transmit queue: frames queued, */
+      put_s(" FULL="); put_dec(g_tq_full); put_s(" LOST="); put_dec(g_tq_lost);        /* confirmed, queue full, lost,  */
+      put_s(" MAX="); put_dec(g_tq_max);                                            /* most queued at once           */
+      put_s("\r\n");
    }
    {  /* scan table */
       USHORT n, q;
