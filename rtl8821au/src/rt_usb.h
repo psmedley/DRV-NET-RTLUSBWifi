@@ -423,6 +423,14 @@ extern ULONG  g_r21_mcufwdl, g_r21_cfg;
 extern USHORT g_r21_tried;
 int    rtl8821_phy_init(usb_dev_t *dev);          /* rtl8821_phy.c: MAC / BB / RF init after the firmware runs */
 void   rtl8821_set_channel(usb_dev_t *dev, UCHAR ch);
+void   rtl8821_set_channel40(usb_dev_t *dev, UCHAR ch, UCHAR sec);   /* HT40: primary ch, secondary above (1) / below (3) */
+extern UCHAR g_r21_bw40, g_r21_sc, g_r21_txsc, g_r21_ctr;      /* rtl8821_phy.c: the bandwidth now set (read-out HT40) */
+/* HT40 receive (rtl_rx.c, join). R21_HT40 1: on a 5 GHz access point whose HT operation element has a secondary
+ * channel and allows any channel width, the association request offers 40 MHz (HT capabilities 0x006E: + 40 MHz,
+ * + short GI at 40 MHz) and, once associated, the PHY goes to 40 MHz around the centre channel. Our own frames stay
+ * 20 MHz wide on the primary channel. 2.4 GHz stays at 20 MHz. 0: 20 MHz everywhere, as before. */
+#define R21_HT40 1
+extern UCHAR g_ht40_sec;                          /* rtl_rx.c: secondary channel of the joined BSS that we use (0 = 20 MHz) */
 void   rtl8821_rx_enable(usb_dev_t *dev);
 int    rtl8821_efuse_load(usb_dev_t *dev);        /* rtl8821_efuse.c */
 int    rtl8821_early_power(usb_dev_t *dev);       /* rtl8821_hal.c: MAC power-on only */
@@ -494,7 +502,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.5a1"
-#define DRV_BUILD     "release"
+#define DRV_BUILD     "ht40"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 

@@ -1710,6 +1710,27 @@ void rtl8188eu_ba_tick(usb_dev_t *dev)
  *   supported MCS set: receive MCS 0-7, transmit MCS set defined and equal to the receive set
  * and the WMM information element (Wi-Fi WMM spec 2.2.1: OUI 00:50:F2, type 2, subtype 0, version 1, QoS info 0, no
  * U-APSD). Access points only use HT rates towards a QoS client, so the two go together. R21_HT 0 leaves both out. */
+/* HT40 (R21_HT40): the secondary channel of scan entry k from its HT operation element (61), if it is a 5 GHz network that
+ * allows any channel width: 1 = above, 3 = below; 0 = stay at 20 MHz. */
+UCHAR g_ht40_sec;
+
+static UCHAR ht40_sec(USHORT k)
+{
+   USHORT q;
+   UCHAR *e = g_net[k].ie;
+
+   if (!R21_HT40 || !g_r21_ht || g_net[k].ch <= 14)
+      return 0;
+   for (q = 12; (USHORT)(q + 2) <= g_net[k].ielen && (USHORT)(q + 2 + e[q + 1]) <= g_net[k].ielen;
+        q = (USHORT)(q + 2 + e[q + 1]))
+      if (e[q] == 61 && e[q + 1] >= 2) {
+         if ((e[q + 3] & 0x04) && ((e[q + 3] & 0x03) == 1 || (e[q + 3] & 0x03) == 3))
+            return (UCHAR)(e[q + 3] & 0x03);
+         return 0;
+      }
+   return 0;                                    /* no HT operation element (or beyond what the scan table kept) */
+}
+
 static UCHAR g_htcap[28] = { 45, 26, 0x2C, 0x00, R21_AMPDU_PARAM,
                              0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0,
                              0, 0, 0, 0, 0, 0, 0 };
@@ -1837,6 +1858,8 @@ int rtl8188eu_join(usb_dev_t *dev, UCHAR *want_bssid)
    tcom_mac(g_target); tcom_str(" ch"); tcom_dec(g_net[best].ch);
 
    rtl8188eu_tx_prepare(dev);
+   g_ht40_sec = ht40_sec(best);
+   g_htcap[2] = (UCHAR)(g_ht40_sec ? 0x6E : 0x2C);    /* HT capabilities info: + 40 MHz, + short GI at 40 MHz */
    rtl8821_set_channel(dev, g_net[best].ch);
    g_curch = g_net[best].ch;
    rtl8821_iqk(dev, g_net[best].ch);                  /* firmware IQ calibration on the access point's channel */
@@ -1902,6 +1925,8 @@ int rtl8188eu_join(usb_dev_t *dev, UCHAR *want_bssid)
    g_joined  = 1;
    g_open = g_want_open;
    keys_reset(dev, (UCHAR)(g_open ? 0 : 1));      /* empty CAM, security on (no keys yet) - off for an open network */
+   if (g_ht40_sec)
+      rtl8821_set_channel40(dev, g_net[best].ch, g_ht40_sec);   /* associated with 40 MHz offered: widen the PHY now */
    if (g_ba_pend)
       ndis_kick();                                /* an ADDBA request that came with the association response: answer it
                                                    * now, not after the 4-way handshake (it may hold the EAPOL frames) */

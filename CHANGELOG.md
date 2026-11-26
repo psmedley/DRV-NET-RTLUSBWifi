@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### RTL8821AU
+* HT40 receive on 5 GHz (`R21_HT40`, on; 0 = 20 MHz as before). When the access point's HT operation element has a
+  secondary channel and allows any channel width, the association request offers 40 MHz (HT capabilities info
+  0x006E: + 40 MHz, + short GI at 40 MHz), and once associated the PHY goes to 40 MHz around the centre channel
+  (`rtl8821_set_channel40`: MAC 0x668, 0x483, BB 0x8AC / 0x8C4 / 0x838 / 0x848 / 0xA00 and RF 0x18 as the Linux
+  driver's phy_PostSetBwMode8812 sets them for CHANNEL_WIDTH_40). Our own frames stay 20 MHz wide on the primary
+  channel (DATA_SC in the TX descriptor). A scan or a new join goes back to 20 MHz. 2.4 GHz stays at 20 MHz. New
+  read-out line `HT40 ON= SEC= BW= SC= CTR= CH=`.
+
 ## 0.1.5a1 (2026-11-22)
 
 Merges Paul Smedley's Block Ack work (psmedley/DRV-NET-RTLUSBWifi, pull request #5 and the pull requests before it): HT20 / WMM
