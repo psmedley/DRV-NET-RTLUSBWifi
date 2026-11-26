@@ -835,7 +835,8 @@ static void async_complete(RT_USBRB FAR *rb)
          g_rx_tgl ^= (UCHAR)(((n >> 9) + (n < rx_bufsz() ? 1 : 0)) & 1);
       }
       if (rb->status == 0 && n > 0 && n <= rx_bufsz()) {
-         rtl_rx_feed(rx_buf(idx), n);                 /* parse + hand frames up (no blocking!) */
+         rtl_rx_feed(rx_buf(idx), n,                  /* parse + hand frames up (no blocking!) */
+                     (UCHAR)(usb_rx_aggok() ? (n < rx_bufsz() ? 2 : 1) : 0));
       } else if (rb->status != 0) {
          g_rx_err++;
          g_rx_errtot++;
