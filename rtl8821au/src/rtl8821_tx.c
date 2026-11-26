@@ -56,6 +56,8 @@ void rtl8821_fill_desc(UCHAR *b, USHORT n, int bcast, UCHAR qsel, int sec, UCHAR
    if (rpt) put32le(b + 8, 0x00080000UL);                                           /* SPE_RPT: TX report (C2H) after sending */
    put32le(b + 12, 0x00000500UL);                                                   /* USE_RATE | DISABLE_FB */
    put32le(b + 16, (ULONG)(rate & 0x7F) | 0x00000800UL | 0x00020000UL | 0x00300000UL);   /* rate, fallback limit 8, retry limit 12 */
+   if (g_r21_txsc)
+      put32le(b + 20, (ULONG)g_r21_txsc);                                           /* DATA_SC: at 40 MHz, 20 MHz frames go out on the primary half */
    put32le(b + 32, 0x00008000UL);                                                   /* HWSEQ_EN: the chip numbers the frame */
    for (i = 0; i < 16; i++)
       ck ^= (USHORT)(b[2 * i] | (b[2 * i + 1] << 8));

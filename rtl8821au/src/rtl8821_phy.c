@@ -91,6 +91,8 @@
 #define rFc_area             0x0860
 #define rRFMOD               0x08AC
 #define rADC_Buf_Clk         0x08C4
+#define rCCAonSec            0x0838
+#define rCCK_System          0x0A00
 #define rL1PeakTH            0x0848
 #define rHSSIRead            0x08B0
 #define rA_TxScale           0x0C1C
@@ -113,7 +115,11 @@
 /* ---- results for the diagnostics (rtl_dhcp.c) -------------------------------------------------------- */
 USHORT g_r21_phy_stage;                     /* 1 mac tbl, 2 mac init, 3 bb, 4 agc, 5 rf, 6 band, 7 channel, 8 done */
 ULONG  g_r21_chk[8];                        /* register read-backs after the init (see r21_phy_init) */
-USHORT g_r21_channel;                       /* channel currently set (0 = none) */
+USHORT g_r21_channel;                       /* channel currently set (0 = none); with 40 MHz the centre channel */
+UCHAR  g_r21_bw40;                          /* 1 = the PHY is set for 40 MHz (rtl8821_set_channel40) */
+UCHAR  g_r21_sc;                            /* REG_DATA_SC: where the primary 20 MHz lies (1 upper, 2 lower; 0 at 20 MHz) */
+UCHAR  g_r21_txsc;                          /* the same for the TX descriptor's DATA_SC (rtl8821_tx.c) */
+UCHAR  g_r21_ctr;                           /* the 40 MHz centre channel (0 at 20 MHz) */
 
 /* ---- 32-bit helpers built from 16-bit operations ------------------------------------------------------- */
 typedef union { ULONG l; USHORT w[2]; UCHAR b[4]; } r21_u32;
@@ -441,7 +447,13 @@ static void r21_bw20(usb_dev_t *dev)
    bb_set(dev, rRFMOD, 0x003003C3UL, 0x00300200UL >> 0);
    bb_set(dev, rADC_Buf_Clk, 0x40000000UL, 0UL);
    bb_set(dev, rL1PeakTH, 0x03C00000UL, 8UL);
+   bb_set(dev, rRFMOD, 0x0000003CUL, 0UL);                               /* primary sub-channel: none */
+   bb_set(dev, rCCAonSec, 0xF0000000UL, 0UL);
    /* the RF bandwidth bits [11:10] = 3 are part of the RF 0x18 value written by rtl8821_set_channel */
+   g_r21_bw40 = 0;
+   g_r21_sc   = 0;
+   g_r21_txsc = 0;
+   g_r21_ctr  = 0;
 }
 
 /* ---- transmit power ----------------------------------------------------------------------------------------
@@ -586,6 +598,37 @@ void rtl8821_set_channel(usb_dev_t *dev, UCHAR ch)
    rf_write(dev, RF_CHNLBW, g_rf18);
    g_r21_channel = ch;
    r21_txpower(dev, ch);
+   if (g_r21_bw40)
+      r21_bw20(dev);                                                     /* a scan or a new join: back to 20 MHz */
+}
+
+/* 40 MHz (HT40) on primary channel ch with the secondary channel above (sec 1) or below (sec 3), as the HT operation
+ * element gives it: phy_SwChnl8812 on the centre channel, then phy_PostSetBwMode8812 and PHY_RF6052SetBandwidth8812 for
+ * CHANNEL_WIDTH_40, 1T1R. The primary 20 MHz sub-channel (phy_GetSecondaryChnl_8812): 2 = lower half
+ * (VHT_DATA_SC_20_LOWER_OF_80MHZ, secondary above), 1 = upper half. Our own frames stay 20 MHz wide on the primary
+ * channel (DATA_SC in the TX descriptor). */
+void rtl8821_set_channel40(usb_dev_t *dev, UCHAR ch, UCHAR sec)
+{
+   UCHAR ctr = (UCHAR)(sec == 1 ? ch + 2 : ch - 2);
+   UCHAR sc  = (UCHAR)(sec == 1 ? 2 : 1);
+   UCHAR l1;
+
+   rtl8821_set_channel(dev, ctr);                                        /* tune to the centre, 20 MHz settings */
+   g_rf18 = (g_rf18 & ~0x00000C00UL) | 0x00000400UL;                     /* RF 0x18 bandwidth bits [11:10] = 1: 40 MHz */
+   rf_write(dev, RF_CHNLBW, g_rf18);
+   rtw_write16(dev, REG_WMAC_TRXPTCL_CTL, (USHORT)((rtw_read16(dev, REG_WMAC_TRXPTCL_CTL) | 0x0080) & 0xFEFF));   /* MAC: 40 MHz */
+   rtw_write8(dev, REG_DATA_SC, sc);
+   bb_set(dev, rRFMOD, 0x003003C3UL, 0x00300201UL);
+   bb_set(dev, rADC_Buf_Clk, 0x40000000UL, 0UL);
+   bb_set(dev, rRFMOD, 0x0000003CUL, (ULONG)sc);
+   bb_set(dev, rCCAonSec, 0xF0000000UL, (ULONG)sc);
+   l1 = (UCHAR)((rtw_read8(dev, 0x0837) & 0x04) ? 6 : 8);                /* L1 peak threshold, 1R */
+   bb_set(dev, rL1PeakTH, 0x03C00000UL, (ULONG)l1);
+   bb_set(dev, rCCK_System, 0x00000010UL, sc == 1 ? 1UL : 0UL);
+   g_r21_bw40 = 1;
+   g_r21_sc   = sc;
+   g_r21_txsc = sc;
+   g_r21_ctr  = ctr;
 }
 
 /* debug-channel access to the RF path A registers */
