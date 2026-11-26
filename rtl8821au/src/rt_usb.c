@@ -487,6 +487,38 @@ static RT_USBRB g_rxrb;
 #define RXN       1
 #define RXBUFSZ   2048
 static UCHAR    g_rxring[RXN][RXBUFSZ];
+/* With receive aggregation (R21_RX_AGG) the request is USB_RXBIG bytes of physical memory instead, outside DGROUP:
+ * allocated at INIT, mapped through a GDT selector when the receive engine starts (ring 0). g_rxring stays as the
+ * fallback when that memory is missing. */
+static ULONG    g_rxbig_phys;
+static USHORT   g_rxbig_sel;
+static UCHAR    g_rxbig_alloc, g_rxbig_mapped;
+USHORT          g_rx_big;
+
+int usb_rx_alloc(void)
+{
+   if (!R21_RX_AGG)
+      return 0;
+   if (rt_dh_alloc_phys((ULONG)USB_RXBIG, 0, &g_rxbig_phys) != 0 || rt_dh_alloc_gdt(&g_rxbig_sel, 1) != 0)
+      return -1;
+   g_rxbig_alloc = 1;
+   return 0;
+}
+
+int usb_rx_aggok(void)
+{
+   return R21_RX_AGG && g_rxbig_alloc;
+}
+
+static USHORT rx_bufsz(void)
+{
+   return g_rx_big ? (USHORT)USB_RXBIG : (USHORT)RXBUFSZ;
+}
+
+static PUCHAR rx_buf(UCHAR idx)
+{
+   return g_rx_big ? (PUCHAR)MAKEP(g_rxbig_sel, 0) : (PUCHAR)g_rxring[idx];
+}
 USHORT          g_rxgap[5];                       /* RX completions by time since the previous one: same ms, 1-2, 3-9, 10-19, 20+ ms */
 static ULONG    g_rx_tprev;
 static UCHAR    g_rx_tgl;                                /* data toggle of the next request to submit */
@@ -584,8 +616,8 @@ static int rx_submit(usb_dev_t *dev, UCHAR ep, UCHAR idx)
    g_rxrb.flags         = (USHORT)(USRB_FLAGS_DET_BULK | USRB_FLAGS_TTYPE_IN);
    if (g_rx_tgl)
       g_rxrb.flags |= USRB_FLAGS_DET_DTGGLEON;
-   g_rxrb.buffer1       = (PUCHAR)g_rxring[idx];
-   g_rxrb.buffer1Length = RXBUFSZ;
+   g_rxrb.buffer1       = rx_buf(idx);
+   g_rxrb.buffer1Length = rx_bufsz();
    g_rxrb.serviceTime   = USB_DEFAULT_SRV_INTV;
    g_rxrb.maxPacketSize = ep_mps(dev, ep, 1);
    g_rxrb.maxErrorCount = USB_MAX_ERROR_COUNT;
@@ -608,6 +640,9 @@ int usb_rx_start(usb_dev_t *dev, UCHAR ep)
 
    g_rx_ep  = ep;
    g_rx_tgl = g_tgl_in[ep & 0x0F];
+   if (g_rxbig_alloc && !g_rxbig_mapped && rt_dh_phys_to_gdt(g_rxbig_phys, (USHORT)USB_RXBIG, g_rxbig_sel) == 0)
+      g_rxbig_mapped = 1;
+   g_rx_big = (USHORT)(RXN == 1 && g_rxbig_mapped);   /* one buffer: only one request can be outstanding anyway */
    g_rx_run = 1;
    for (i = 0; i < RXN; i++)
       if (rx_submit(dev, ep, i) != 0) {
@@ -793,14 +828,14 @@ static void async_complete(RT_USBRB FAR *rb)
       g_rx_done++;
       g_rx_laststat = (USHORT)rb->status;
       g_rx_lastn = n;
-      if (rb->status == 0 && n <= RXBUFSZ) {
+      if (rb->status == 0 && n <= rx_bufsz()) {
          g_rx_err = 0;
          /* packets consumed: n / 512 full ones plus the short (or zero-length) packet that ended the transfer; a request that
           * filled the whole buffer ended without one */
-         g_rx_tgl ^= (UCHAR)(((n >> 9) + (n < RXBUFSZ ? 1 : 0)) & 1);
+         g_rx_tgl ^= (UCHAR)(((n >> 9) + (n < rx_bufsz() ? 1 : 0)) & 1);
       }
-      if (rb->status == 0 && n > 0 && n <= RXBUFSZ) {
-         rtl_rx_feed(g_rxring[idx], n);               /* parse + hand frames up (no blocking!) */
+      if (rb->status == 0 && n > 0 && n <= rx_bufsz()) {
+         rtl_rx_feed(rx_buf(idx), n);                 /* parse + hand frames up (no blocking!) */
       } else if (rb->status != 0) {
          g_rx_err++;
          g_rx_errtot++;

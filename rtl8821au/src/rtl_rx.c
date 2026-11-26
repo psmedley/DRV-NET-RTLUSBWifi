@@ -1189,7 +1189,7 @@ static void rx_c2h(UCHAR *c, USHORT n)
 /* Walk g_acc: [24B RX desc][drvinfo][shift][pkt_len bytes] per frame, back to
  * back (RX aggregation is off, so no padding). Frames can straddle reads, so
  * leftover bytes are shifted to the front and completed by the next read. */
-static void rx_parse(void)
+static USHORT rx_parse(void)
 {
    USHORT off = 0, remain, pl, drv, sh, total, i, nfr = 0, t8;
    UCHAR *p, newev;
@@ -1278,6 +1278,7 @@ static void rx_parse(void)
          g_acc[i] = g_acc[off + i];
       g_accn = (USHORT)(g_accn - off);
    }
+   return nfr;
 }
 
 /* The receive stream is now fed by the always-on asynchronous bulk-IN request (see
@@ -1290,25 +1291,37 @@ static USHORT rx_read(usb_dev_t *dev, UCHAR ep, USHORT tmo_ms)
    return 0;
 }
 
-/* Completion context (task time, must not block): append to the stream and parse. */
-void rtl_rx_feed(UCHAR *buf, USHORT n)
+/* Completion context (task time, must not block): append to the stream and parse. With receive aggregation a transfer
+ * carries several frames and can be larger than the stream buffer, so it goes in in pieces, each parsed before the next
+ * (what a parse leaves behind is less than one frame). */
+USHORT g_dg_maxfr;                                 /* most frames in one USB transfer (read-out RXAGG) */
+
+void rtl_rx_feed(UCHAR FAR *buf, USHORT n)
 {
-   USHORT i, held;
+   USHORT held, c, nfr = 0;
 
    g_dg_feeds++;
    if (n > g_dg_maxn) g_dg_maxn = n;
    if (n >= USB_RXBUF) g_dg_full++;
+   held = rt_lock_acquire(&g_rx_owner, (USHORT)(rt_cpu_id() + 1));   /* against rtl8188eu_ro_kick on another CPU */
    if (g_acc_reset) {                            /* channel change / join: start a fresh stream */
       g_acc_reset = 0;
       g_accn = 0;
    }
-   if ((USHORT)(g_accn + n) > ACCSZ)             /* overflow guard: start over   */
-      g_accn = 0;
-   for (i = 0; i < n; i++)
-      g_acc[g_accn + i] = buf[i];
-   g_accn = (USHORT)(g_accn + n);
-   held = rt_lock_acquire(&g_rx_owner, (USHORT)(rt_cpu_id() + 1));   /* against rtl8188eu_ro_kick on another CPU */
-   rx_parse();
+   while (n) {
+      if (g_accn >= ACCSZ)                       /* the parse could not consume anything: start over */
+         g_accn = 0;
+      c = (USHORT)(ACCSZ - g_accn);
+      if (c > n)
+         c = n;
+      rt_movmem((PVOID)(g_acc + g_accn), (PVOID)buf, c);
+      g_accn = (USHORT)(g_accn + c);
+      buf += c;
+      n = (USHORT)(n - c);
+      nfr = (USHORT)(nfr + rx_parse());
+   }
+   if (nfr > g_dg_maxfr)
+      g_dg_maxfr = nfr;
    if (!held)
       rt_lock_release(&g_rx_owner);
 }

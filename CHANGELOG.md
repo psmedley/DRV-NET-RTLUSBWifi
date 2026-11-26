@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### RTL8821AU
+* USB receive aggregation (`R21_RX_AGG`, on; 0 = off as before). The chip now collects received frames and sends
+  them up the bulk-IN pipe several at a time (RXDMA_AGG_EN, DMA mode, flush at `R21_RX_AGG_KB` = 6 KB or after
+  `R21_RX_AGG_TMO`), into one 8 KB request in physical memory from INIT (outside the data segment). Until now every
+  frame was its own USB transfer with one request outstanding, so the access point's A-MPDU bursts (up to 16 KB)
+  may have overflowed the chip's 16 KB receive buffer: 3-6% of the download frames came out of order. A transfer
+  larger than the stream buffer is fed to the parser in pieces. New read-out line
+  `RXAGG ON= BIG= TRX= REG= MAXFR=`: the switch with its buffer, whether requests use it, the two registers read
+  back, and the most frames seen in one transfer. Without the buffer the driver runs as before.
+
 ## 0.1.5a1 (2026-11-22)
 
 Merges Paul Smedley's Block Ack work (psmedley/DRV-NET-RTLUSBWifi, pull request #5 and the pull requests before it): HT20 / WMM

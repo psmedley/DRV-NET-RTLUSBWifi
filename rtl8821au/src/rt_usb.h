@@ -268,7 +268,23 @@ void   usb_xfer_unlock(void);
 #define TX_ETH_OFF    66
 void   usb_tx_release(USHORT slot);
 extern USHORT g_tx_busy, g_tx_err;
-void   rtl_rx_feed(UCHAR *buf, USHORT n);          /* implemented in rtl_rx.c (completion context) */
+void   rtl_rx_feed(UCHAR FAR *buf, USHORT n);      /* implemented in rtl_rx.c (completion context) */
+/* USB receive aggregation. R21_RX_AGG 1: the chip collects received frames and sends them up the bulk-IN pipe several
+ * at a time (RXDMA_AGG_EN, DMA mode, as the Linux driver runs it), into one 8 KB request (USB_RXBIG, physical memory
+ * from INIT, outside DGROUP). Without it every frame is its own USB transfer, with one request outstanding, and the
+ * access point's A-MPDU bursts (16 KB) may overflow the chip's 16 KB receive buffer before USB collects them.
+ * R21_RX_AGG_KB: flush once this many KB are collected (REG_RXDMA_AGG_PG_TH byte 0); R21_RX_AGG_TMO: or after this
+ * timeout (byte 1). R21_RX_AGG 0: one frame per transfer, as before. */
+#define R21_RX_AGG      1
+#define R21_RX_AGG_KB   6
+#define R21_RX_AGG_TMO  0x10
+#define USB_RXBIG       8192
+int    usb_rx_alloc(void);                         /* INIT (ring 3): the aggregation buffer's memory (0 = ok)       */
+int    usb_rx_aggok(void);                         /* the buffer exists: the chip may aggregate                     */
+extern USHORT g_rx_big;                            /* 1 = requests use the 8 KB buffer                              */
+extern ULONG  g_r21_rxagg;                         /* rtl8821_phy.c: REG_RXDMA_AGG_PG_TH read back after the setup  */
+extern UCHAR  g_r21_trxdma;                        /* rtl8821_phy.c: REG_TRXDMA_CTRL low byte read back             */
+extern USHORT g_dg_maxfr;                          /* rtl_rx.c: most frames in one USB transfer                     */
 
 /*
  * One control transfer. Builds the 8-byte setup packet from the args, posts a
@@ -494,7 +510,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.5a1"
-#define DRV_BUILD     "release"
+#define DRV_BUILD     "rxagg"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
