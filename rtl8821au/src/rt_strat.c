@@ -168,6 +168,8 @@ static void rt_init(RP_INIT FAR *rp)
    }
    if (rtl8188eu_ro_alloc() != 0)
       say("RTL8821AU: the Block Ack reorder buffer could not be allocated (frames go up unordered).");
+   if (usb_rx_alloc() != 0)
+      say("RTL8821AU: the USB receive aggregation buffer could not be allocated (one frame per transfer).");
    tcom_always('I'); tcom_always('5');
    dhcp_init();                         /* GDT selector for returning the DHCP lease on a device read */
    dbg_init();
