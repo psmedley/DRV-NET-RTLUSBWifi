@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### RTL8821AU
+* New read-out line `AP HTCAP= SS= HTOP= VHTCAP= VHTOP=`: what the joined access point's beacons offer for channel
+  width, to see whether 40 or 80 MHz could be used. The driver joins at 20 MHz; HT40 or VHT80 would be the way to
+  faster downloads, but only if the access point offers them. `HTCAP` is its HT capabilities info (bit 1 = 40 MHz),
+  `SS` the spatial streams in its MCS set, `HTOP` its primary channel and the HT operation byte with the secondary
+  channel (bits 1:0, 1 = above, 3 = below) and bit 2 (any width allowed), `VHTCAP` the low byte of its VHT
+  capabilities and `VHTOP` the VHT channel width (0 = 20/40, 1 = 80, 2 = 160 MHz) and centre channels. `FFFF` / `FF` /
+  255: the element is missing.
+
 ## 0.1.5a1 (2026-11-22)
 
 Merges Paul Smedley's Block Ack work (psmedley/DRV-NET-RTLUSBWifi, pull request #5 and the pull requests before it): HT20 / WMM

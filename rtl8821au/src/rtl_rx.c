@@ -828,11 +828,24 @@ USHORT        g_ba_ms;                           /* request -> decline queued, t
 /* One management frame (beacon 0x80 / probe response 0x50): record the network. */
 static int ssid_match(net_t *nt);
 
+/* What the joined access point's beacons offer for channel width (read-out line AP), to see whether 40 / 80 MHz could
+ * be used at all:
+ *   g_ap_htcap  HT capabilities info (bit 1 = 40 MHz supported, bit 6 = short GI at 40 MHz); 0xFFFF = no HT element
+ *   g_ap_ss     spatial streams in its HT receive MCS set (bytes 0-3 of the set that are not zero)
+ *   g_ap_htop   HT operation: primary channel, and byte 2 (bits 1:0 secondary channel 1 = above / 3 = below, bit 2 =
+ *               any channel width allowed); 0xFF = no HT operation element
+ *   g_ap_vhtcap VHT capabilities info, low byte (bits 3:2 = 160 MHz support); 0xFF = no VHT capabilities element
+ *   g_ap_vhtop  VHT operation: channel width (0 = 20/40, 1 = 80, 2 = 160, 3 = 80+80), centre channel segments 0 and 1;
+ *               0xFF = no VHT operation element
+ * Taken from every beacon of the joined BSSID. */
+USHORT g_ap_htcap = 0xFFFF;
+UCHAR  g_ap_ss, g_ap_htop[2] = { 0xFF, 0xFF }, g_ap_vhtcap = 0xFF, g_ap_vhtop[3] = { 0xFF, 0xFF, 0xFF };
+
 static void note_frame(UCHAR *f, USHORT len, signed char rssi)
 {
    UCHAR *ie, *end;
    USHORT cap, i, k, ielim;
-   UCHAR  ch, sec, slen;
+   UCHAR  ch, sec, slen, mine;
    char   ssid[33];
 
    g_nfrm++;
@@ -967,10 +980,29 @@ static void note_frame(UCHAR *f, USHORT len, signed char rssi)
    ie  = f + 36;
    end = f + len;
    ielim = 12;                                  /* timestamp + interval + capability */
+   mine = (UCHAR)g_joined;
+   for (i = 0; mine && i < 6; i++)
+      if (f[16 + i] != g_jbssid[i])
+         mine = 0;
    while (ie + 2 <= end) {
       UCHAR t = ie[0], l = ie[1];
       if (ie + 2 + l > end)
          break;
+      if (mine) {                                /* the joined access point: what it offers (read-out AP) */
+         if (t == 45 && l >= 7) {
+            g_ap_htcap = (USHORT)(ie[2] | (ie[3] << 8));
+            g_ap_ss = (UCHAR)((ie[5] != 0) + (ie[6] != 0) + (ie[7] != 0) + (ie[8] != 0));
+         } else if (t == 61 && l >= 2) {
+            g_ap_htop[0] = ie[2];
+            g_ap_htop[1] = ie[3];
+         } else if (t == 191 && l >= 1) {
+            g_ap_vhtcap = ie[2];
+         } else if (t == 192 && l >= 3) {
+            g_ap_vhtop[0] = ie[2];
+            g_ap_vhtop[1] = ie[3];
+            g_ap_vhtop[2] = ie[4];
+         }
+      }
       if (t == 0) {                              /* SSID                         */
          slen = (l > 32) ? 32 : l;
          for (i = 0; i < slen; i++) {

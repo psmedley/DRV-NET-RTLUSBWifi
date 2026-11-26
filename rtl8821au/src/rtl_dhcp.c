@@ -362,6 +362,13 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" TID="); put_dec(g_ba_tid);
       put_s(" AMSDU="); put_dec(g_amsdu_n); put_s("/"); put_dec(g_amsdu_sub); put_s("/"); put_dec(g_amsdu_bad);   /* frames / subframes / dropped */
       put_s("\r\n");
+      put_s("AP HTCAP="); put_h8((UCHAR)(g_ap_htcap >> 8)); put_h8((UCHAR)g_ap_htcap);   /* the joined AP's beacons: HT  */
+      put_s(" SS="); put_dec(g_ap_ss);                                                 /* capabilities, streams, HT    */
+      put_s(" HTOP="); put_dec(g_ap_htop[0]); put_s("/"); put_h8(g_ap_htop[1]);        /* operation (primary channel / */
+      put_s(" VHTCAP="); put_h8(g_ap_vhtcap);                                         /* byte 2), VHT capabilities,  */
+      put_s(" VHTOP="); put_dec(g_ap_vhtop[0]); put_s("/"); put_dec(g_ap_vhtop[1]);   /* VHT operation (width /      */
+      put_s("/"); put_dec(g_ap_vhtop[2]);                                              /* centre segments 0 and 1)    */
+      put_s("\r\n");
       put_s("BAACC="); put_dec(g_r21_ba); put_s(" BAON=");        /* Block Ack receive: switch, TIDs with an agreement */
       put_dec(rtl8188eu_ba_on());                                  /* (bit n = TID n); frames of those TIDs, out of     */
       put_s(" BARX="); put_dec(g_ba_rx); put_s(" OOO="); put_dec(g_ba_ooo);   /* order, sequence gaps, duplicates */

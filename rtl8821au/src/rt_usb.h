@@ -484,6 +484,8 @@ void   rtl8188eu_ba_tick(usb_dev_t *dev);         /* rtl_rx.c: answer a pending 
 void   rtl8188eu_ba_hook(void);                   /* rtl_rx.c: the same from the context hook, without blocking */
 int    ndis_kick(void);                           /* rt_ndis.c: arm the context hook (0 = no hook)                */
 UCHAR  rtl8188eu_ht_state(void);                  /* rtl_rx.c: what the association response granted (read-out) */
+extern USHORT g_ap_htcap;                          /* rtl_rx.c: the joined access point's channel width offer (read-out AP) */
+extern UCHAR  g_ap_ss, g_ap_htop[2], g_ap_vhtcap, g_ap_vhtop[3];
 extern UCHAR  g_r21_ht, g_ba_tid, g_r21_ba;
 extern USHORT g_ba_rx, g_ba_ooo, g_ba_gap, g_ba_dupw, g_ba_del;
 extern USHORT g_agg_all, g_agg_me, g_dq_qos, g_dq_plain, g_dq_tid[8];
@@ -494,7 +496,7 @@ extern USHORT g_ba_req, g_ba_tx, g_ba_fail, g_ba_fast, g_ba_ms, g_amsdu_n, g_ams
  * a boot message, BLDLEVEL (rtl88eu.lnk, kept in step by hand) or a read-out file shows which driver produced it. The
  * read-out's BUILD= line adds the compile date and time. */
 #define DRV_VERSION   "0.1.5a1"
-#define DRV_BUILD     "release"
+#define DRV_BUILD     "apwidth"
 
 /* The resident-end markers (rt_code_end / rt_data_end) are in rt_end.asm, linked last. */
 
