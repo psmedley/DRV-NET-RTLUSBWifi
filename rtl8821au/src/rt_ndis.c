@@ -414,7 +414,7 @@ WORD __cdecl ndis_c_transmit(WORD protID, WORD reqHandle, PTCBD pTCBufferD)
       gSST.trFrHW++;                                     /* no connection / keys yet: the frame is lost */
       return NDIS_SUCCESS;
    }
-   slot = rtl8188eu_ndis_slot();
+   slot = rtl8188eu_ndis_slot_wait(R21_TX_WAIT);         /* R21_TX_WAIT 0: no wait, the protocol retries */
    if (slot == 0xFFFF) {
       if (rtl8188eu_tx_stuck()) {
          gSST.trFrHW++;                                  /* the dongle stopped taking frames: drop, never make the */
