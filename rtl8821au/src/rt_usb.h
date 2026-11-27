@@ -278,7 +278,7 @@ void   rtl_rx_feed(UCHAR FAR *buf, USHORT n, UCHAR mode);   /* rtl_rx.c (complet
  * timeout (byte 1). R21_RX_AGG 0: one frame per transfer, as before. */
 #define R21_RX_AGG      1
 #define R21_RX_AGG_KB   6
-#define R21_RX_AGG_TMO  0x10
+#define R21_RX_AGG_TMO  0x04
 #define USB_RXBIG       8192
 int    usb_rx_alloc(void);                         /* INIT (ring 3): the aggregation buffer's memory (0 = ok)       */
 int    usb_rx_aggok(void);                         /* the buffer exists: the chip may aggregate                     */
@@ -386,6 +386,11 @@ int    rtl8188eu_eth_tx(usb_dev_t *dev, UCHAR FAR *eth, USHORT len);
 int    rtl8188eu_ndis_tx(UCHAR *eth, USHORT len);   /* async encrypted data TX (copies eth into a slot) */
 int    rtl8188eu_ndis_tx_slot(USHORT slot, USHORT len);   /* same, Ethernet frame already at TX_ETH_OFF in the slot */
 USHORT rtl8188eu_ndis_slot(void);                     /* a free TX slot for it (waits briefly), 0xFFFF = none */
+USHORT rtl8188eu_ndis_slot_wait(int wait);            /* the same; wait = 0: no wait */
+/* TransmitChain with all USB transmit slots busy: 1 = wait up to about 6 ms for one (as before), 0 = answer "out of
+ * resource" at once. The wait spins at ring 0 and held up the receive path during uploads (TCP ACKs delayed by up to
+ * 0.5 s); without it an upload went from 0.68 to 1.00 MB/s. */
+#define R21_TX_WAIT 0
 int    rtl8188eu_tx_ready(void);                     /* joined with a pairwise key: data frames can be sent */
 extern UCHAR g_ctlrate;                  /* rtl_rx.c */
 void   usb_tx_reset(void);                      /* rt_usb.c: free all TX slots (device detached) */
