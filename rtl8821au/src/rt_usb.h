@@ -278,7 +278,7 @@ void   rtl_rx_feed(UCHAR FAR *buf, USHORT n, UCHAR mode);   /* rtl_rx.c (complet
  * timeout (byte 1). R21_RX_AGG 0: one frame per transfer, as before. */
 #define R21_RX_AGG      1
 #define R21_RX_AGG_KB   6
-#define R21_RX_AGG_TMO  0x04
+#define R21_RX_AGG_TMO  0x04    /* 0x10 in #11; shorter here to cut the delay a frame can wait in the chip */
 #define USB_RXBIG       8192
 int    usb_rx_alloc(void);                         /* INIT (ring 3): the aggregation buffer's memory (0 = ok)       */
 int    usb_rx_aggok(void);                         /* the buffer exists: the chip may aggregate                     */
