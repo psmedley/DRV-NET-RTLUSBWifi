@@ -10,6 +10,12 @@
   driver's phy_PostSetBwMode8812 sets them for CHANNEL_WIDTH_40). Our own frames stay 20 MHz wide on the primary
   channel (DATA_SC in the TX descriptor). A scan or a new join goes back to 20 MHz. 2.4 GHz stays at 20 MHz. New
   read-out line `HT40 ON= SEC= BW= SC= CTR= CH=`.
+* Uploads: when all USB transmit slots are busy, TransmitChain now answers "out of resource" at once instead of
+  waiting up to about 6 ms for a slot (`R21_TX_WAIT` 0; 1 restores the wait). The wait spins at ring 0, where OS/2
+  does not preempt, and during uploads it held up the receive path, and with it the TCP ACKs, by up to 0.5 s
+  (`TSFJIT` 270-488 ms, against 10 without the wait). In tests (5 GHz, HTTP upload of 150 MB) an upload went from
+  0.68 to 1.00 MB/s. TCP/IP retries refused frames: in about 70,000 data segments one was sent twice. The driver's
+  own frames (its DHCP exchange) still wait for a slot.
 
 ## 0.1.5a1 (2026-11-22)
 

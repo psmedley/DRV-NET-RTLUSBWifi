@@ -2546,11 +2546,23 @@ void rtl8188eu_tx_watchdog(usb_dev_t *dev)
  * instead of making the protocol retry in a tight loop. 0xFFFF = none. */
 USHORT rtl8188eu_ndis_slot(void)
 {
+   return rtl8188eu_ndis_slot_wait(1);
+}
+
+/* wait = 0: no wait. For TransmitChain (R21_TX_WAIT 0): the wait spins at ring 0, where OS/2 does not preempt, and during
+ * uploads it held up the receive path (and with it the TCP ACKs) by up to 0.5 s; answering "out of resource" at once
+ * lets the protocol retry instead. The driver's own frames (DHCP, rtl8188eu_ndis_tx) still wait. */
+USHORT rtl8188eu_ndis_slot_wait(int wait)
+{
    USHORT slot = usb_tx_alloc();
 
    if (slot == 0xFFFF && rtl8188eu_tx_stuck()) {
       g_ntx_stuck++;
       return 0xFFFF;                               /* nothing has completed for a second: do not spin */
+   }
+   if (slot == 0xFFFF && !wait) {
+      g_ntx_noslot++;
+      return 0xFFFF;
    }
    if (slot == 0xFFFF) {
       ULONG  t0 = rtl8188eu_ms();
