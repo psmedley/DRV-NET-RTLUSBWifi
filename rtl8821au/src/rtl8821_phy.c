@@ -114,6 +114,8 @@
 
 /* ---- results for the diagnostics (rtl_dhcp.c) -------------------------------------------------------- */
 USHORT g_r21_phy_stage;                     /* 1 mac tbl, 2 mac init, 3 bb, 4 agc, 5 rf, 6 band, 7 channel, 8 done */
+ULONG  g_r21_rxagg;                         /* REG_RXDMA_AGG_PG_TH after rtl8821_rx_enable (read-out RXAGG) */
+UCHAR  g_r21_trxdma;                        /* REG_TRXDMA_CTRL low byte after it */
 ULONG  g_r21_chk[8];                        /* register read-backs after the init (see r21_phy_init) */
 USHORT g_r21_channel;                       /* channel currently set (0 = none); with 40 MHz the centre channel */
 UCHAR  g_r21_bw40;                          /* 1 = the PHY is set for 40 MHz (rtl8821_set_channel40) */
@@ -653,7 +655,15 @@ void rtl8821_rx_enable(usb_dev_t *dev)
    UCHAR  v8;
 
    v8 = rtw_read8(dev, REG_TRXDMA_CTRL);
-   rtw_write8(dev, REG_TRXDMA_CTRL, (UCHAR)(v8 & ~0x04));               /* RXDMA_AGG_EN off: one frame stream, no USB RX aggregation */
+   if (usb_rx_aggok()) {                                                /* USB receive aggregation, DMA mode (R21_RX_AGG) */
+      rtw_write8(dev, REG_TRXDMA_CTRL, (UCHAR)(v8 | 0x04));             /* RXDMA_AGG_EN */
+      rtw_write16(dev, 0x0280, (USHORT)(R21_RX_AGG_KB | (R21_RX_AGG_TMO << 8)));   /* REG_RXDMA_AGG_PG_TH: size, timeout */
+      rtw_write8(dev, 0x0283, (UCHAR)(rtw_read8(dev, 0x0283) | 0x80));  /* DMA aggregation mode (bit 31 must be set) */
+   } else {
+      rtw_write8(dev, REG_TRXDMA_CTRL, (UCHAR)(v8 & ~0x04));            /* RXDMA_AGG_EN off: one frame stream, no USB RX aggregation */
+   }
+   g_r21_trxdma = rtw_read8(dev, REG_TRXDMA_CTRL);
+   g_r21_rxagg  = rtw_read32(dev, 0x0280);
    for (i = 0; i < 6; i++)
       rtw_write8(dev, (USHORT)(0x0610 + i), g_mymac[i]);                /* MACID */
    rtw_write16(dev, 0x06A0, 0xFFFF);                                    /* RX filter maps: management, control, data */

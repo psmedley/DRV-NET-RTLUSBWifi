@@ -377,6 +377,10 @@ USHORT rtl8188eu_dhcp_read(ULONG phys, USHORT max)
       put_s(" TID=");
       for (q = 0; q < 8; q++) { put_dec(g_dq_tid[q]); if (q < 7) put_s("/"); }
       put_s("\r\n");
+      put_s("RXAGG ON="); put_dec((USHORT)usb_rx_aggok()); put_s(" BIG="); put_dec(g_rx_big);   /* USB receive aggregation:  */
+      put_s(" TRX="); put_h8(g_r21_trxdma); put_s(" REG="); put_h32(g_r21_rxagg);          /* switch + buffer, registers */
+      put_s(" MAXFR="); put_dec(g_dg_maxfr); put_s(" CUT="); put_dec(g_dg_aggcut);       /* most frames per transfer, */
+      put_s("\r\n");
       put_s("RO HELD="); put_dec(g_ro_held); put_s(" REL="); put_dec(g_ro_rel);   /* reorder buffer (TID 0): frames held, */
       put_s(" SKIP="); put_dec(g_ro_skip); put_s(" STALE="); put_dec(g_ro_stale); /* released in order, given up, timeouts, */
       put_s(" BAR="); put_dec(g_ro_bar); put_s(" LATE="); put_dec(g_ro_late);     /* BARs, late frames, held copies dropped, */

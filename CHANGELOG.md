@@ -10,6 +10,17 @@
   driver's phy_PostSetBwMode8812 sets them for CHANNEL_WIDTH_40). Our own frames stay 20 MHz wide on the primary
   channel (DATA_SC in the TX descriptor). A scan or a new join goes back to 20 MHz. 2.4 GHz stays at 20 MHz. New
   read-out line `HT40 ON= SEC= BW= SC= CTR= CH=`.
+* USB receive aggregation (`R21_RX_AGG`, on; 0 = off as before). The chip now collects received frames and sends
+  them up the bulk-IN pipe several at a time (RXDMA_AGG_EN, DMA mode, flush at `R21_RX_AGG_KB` = 6 KB or after
+  `R21_RX_AGG_TMO`), into one 8 KB request in physical memory from INIT (outside the data segment). Until now every
+  frame was its own USB transfer with one request outstanding, so the access point's A-MPDU bursts (up to 16 KB)
+  may have overflowed the chip's 16 KB receive buffer: 3-6% of the download frames came out of order. A transfer
+  larger than the stream buffer is fed to the parser in pieces. New read-out line
+  `RXAGG ON= BIG= TRX= REG= MAXFR= CUT=`: the switch with its buffer, whether requests use it, the two registers read
+  back, the most frames seen in one transfer, and `CUT=`, transfers that ended with a frame cut short. Each
+  aggregated transfer is parsed on its own, with every frame padded to 8 bytes, as the Linux driver does: the first
+  test build parsed the transfers as one stream and guessed the padding per frame, lost step thousands of times
+  (`RXDESYNC`), could not join on 2.4 GHz and stalled downloads on 5 GHz. Without the buffer the driver runs as before.
 
 ## 0.1.5a1 (2026-11-22)
 
